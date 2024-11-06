@@ -1,0 +1,36 @@
+instruction_width = 32;
+
+/// Add values from two registers
+instruction Add {
+  fields:
+    /// The destination register
+    dst: 5,
+    /// The first source register
+    src1: 5,
+    /// The second source register
+    src2: 5,
+    /// Set a flag that sign extends the result
+    sign_extend: 1,
+
+  assembly:
+    'add'['.sx' = sign_extend] 'r'dst 'r'src1 'r'src2;
+
+    examples:
+      /// Add the contents of registers 4 and 7 placing the result in
+      /// register 0.
+      add r0 r4 r7;
+
+      /// Add the contents of registers 4 and 7 sign-extending and
+      /// placing the result in register 0.
+      add.sx r0 r4 r7;
+
+  machine:
+    opcode: 7 = 2,
+    sign_extend,
+    dst,
+    _: 3,
+    src1,
+    _: 3,
+    src2,
+    _: 3,
+}

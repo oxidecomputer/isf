@@ -1,0 +1,14 @@
+[package]
+name = "isf-macro"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+isf = { path = "../isf" }
+proc-macro2.workspace = true
+syn.workspace = true
+serde.workspace = true
+serde_tokenstream = "0.1"
+
+[lib]
+proc-macro = true

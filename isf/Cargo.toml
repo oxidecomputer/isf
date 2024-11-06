@@ -1,0 +1,15 @@
+[package]
+name = "isf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+expectorate.workspace = true
+num_enum.workspace = true
+prettyplease.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+winnow.workspace = true
+paste = "1.0.15"

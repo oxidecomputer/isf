@@ -1,0 +1,10 @@
+[package]
+name = "isf-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+isf-macro = { path = "../isf-macro" }
+isf = { path = "../isf" }
+winnow.workspace = true
+anyhow.workspace = true
