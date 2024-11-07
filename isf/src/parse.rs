@@ -37,13 +37,21 @@ fn parse_instructions(input: &mut &str) -> PResult<Vec<ast::Instruction>> {
 fn instruction(input: &mut &str) -> PResult<ast::Instruction> {
     let doc = docstring.parse_next(input)?;
     let _ = s("instruction").parse_next(input)?;
+    let mut instr = cut_err(instruction_body)
+        .context(StrContext::Label("instruction body"))
+        .parse_next(input)?;
+    instr.doc = doc;
+    Ok(instr)
+}
+
+fn instruction_body(input: &mut &str) -> PResult<ast::Instruction> {
     let name = identifier_parser.parse_next(input)?;
     let parameters =
         instruction_parameters.parse_next(input).unwrap_or_default();
     let base = instruction_base.parse_next(input).ok();
     let _ = s("{").parse_next(input)?;
     let fields = if s("fields:").parse_next(input).is_ok() {
-        cut_err(fields)
+        fields
             .context(StrContext::Label("fields"))
             .parse_next(input)?
     } else {
@@ -66,7 +74,7 @@ fn instruction(input: &mut &str) -> PResult<ast::Instruction> {
     };
     let _ = s("}").parse_next(input)?;
     Ok(ast::Instruction {
-        doc,
+        doc: String::default(),
         name,
         parameters,
         base,
@@ -100,7 +108,9 @@ fn fields(input: &mut &str) -> PResult<Vec<ast::Field>> {
 }
 
 fn field(input: &mut &str) -> PResult<ast::Field> {
-    let doc = docstring.parse_next(input)?;
+    let doc = docstring
+        .context(StrContext::Label("field docstring"))
+        .parse_next(input)?;
     let name = cut_err(s(identifier_parser))
         .context(StrContext::Label("field identifier"))
         .parse_next(input)?;

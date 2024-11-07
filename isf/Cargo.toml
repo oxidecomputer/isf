@@ -12,4 +12,5 @@ proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true
 winnow.workspace = true
+clap.workspace = true
 paste = "1.0.15"

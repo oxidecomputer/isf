@@ -1,10 +1,27 @@
 //! This module contains a Rust codegen implementation for ISF. The
 //! [`generate`] function produces Rust code from an ISF `[spec::Spec]`.
 
+use std::fs::read_to_string;
+
 use crate::spec::{self, AssemblyElement, MachineElement};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::Ident;
+use winnow::Parser;
+
+/// Generate rust code for an ISF file at the given path.
+pub fn generate_code(path: &str) -> anyhow::Result<String> {
+    let text = read_to_string(path)?;
+    let s: &str = text.as_str();
+    let ast = crate::parse::parse
+        .parse(s)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let spec = spec::form_spec(&ast)?;
+    let tokens = generate(&spec);
+    let file: syn::File = syn::parse2(tokens)?;
+    let code = prettyplease::unparse(&file);
+    Ok(code)
+}
 
 /// Generate a set of Rust structs for interacting with instructions. The
 /// generated structs implement the [`AssemblyInstruction`] and
@@ -83,15 +100,13 @@ pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
         if let MachineElement::Constant {
             name,
             width: _,
-            value,
+            value: Some(value),
         } = me
         {
-            if let Some(value) = value {
-                let setter = format_ident!("set_{}", name);
-                tks.extend(quote! {
-                   def.#setter(#value.try_into().unwrap());
-                });
-            }
+            let setter = format_ident!("set_{}", name);
+            tks.extend(quote! {
+               def.#setter(#value.try_into().unwrap());
+            });
         }
     }
 
@@ -300,18 +315,10 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{parse, spec};
-    use std::fs::read_to_string;
 
     #[test]
     fn cg_add() {
-        let text = read_to_string("testcase/add.isf").unwrap();
-        let mut s: &str = text.as_str();
-        let ast = parse::parse(&mut s).expect("parse add.isf");
-        let spec = spec::form_spec(&ast).expect("form add spec");
-        let tokens = generate(&spec);
-        let file: syn::File = syn::parse2(tokens).expect("parse tokens");
-        let code = prettyplease::unparse(&file);
+        let code = generate_code("testcase/add.isf").unwrap();
         expectorate::assert_contents("testcase/add.rs", code.as_str());
     }
 }
