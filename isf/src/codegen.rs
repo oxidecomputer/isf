@@ -52,7 +52,10 @@ pub fn generate_instruction(
     let assembly_emitter = generate_assembly_emitter(instr);
     let machine_parser = generate_machine_parser(instr);
 
+    let doc = format!(" {}", instr.doc);
+
     let generated = quote! {
+        #[doc = #doc]
         #[derive(Debug, PartialEq, Eq)]
         struct #name(#storage);
 

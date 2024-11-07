@@ -168,7 +168,7 @@ fn assembly_element(input: &mut &str) -> PResult<ast::AssemblyElement> {
 
 fn string_literal(input: &mut &str) -> PResult<String> {
     let _ = "'".parse_next(input)?;
-    let content = take_until(1.., "'").parse_next(input)?;
+    let content = take_until(0.., "'").parse_next(input)?;
     let _ = "'".parse_next(input)?;
     Ok(content.to_owned())
 }

@@ -1,3 +1,4 @@
+/// Add values from two registers
 #[derive(Debug, PartialEq, Eq)]
 struct Add(u32);
 impl Default for Add {
