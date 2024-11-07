@@ -29,7 +29,7 @@ pub fn generate_code(path: &str) -> anyhow::Result<String> {
 /// methods for each field.
 pub fn generate(spec: &spec::Spec) -> TokenStream {
     let mut tokens = TokenStream::default();
-    let storage = usize::next_power_of_two(spec.instruction_width);
+    let storage = spec.instruction_width.next_multiple_of(8);
 
     for instruction in &spec.instructions {
         let instr_tokens = generate_instruction(storage, instruction);
@@ -99,14 +99,20 @@ pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
     for me in &instr.machine.layout {
         if let MachineElement::Constant {
             name,
-            width: _,
+            width,
             value: Some(value),
         } = me
         {
             let setter = format_ident!("set_{}", name);
-            tks.extend(quote! {
-               def.#setter(#value.try_into().unwrap());
-            });
+            if *width == 1 {
+                tks.extend(quote! {
+                   def.#setter(#value == 0);
+                });
+            } else {
+                tks.extend(quote! {
+                   def.#setter(#value.try_into().unwrap());
+                });
+            }
         }
     }
 
@@ -214,8 +220,8 @@ pub fn generate_field_methods(
         };
         let getter = format_ident!("get_{name}");
         let setter = format_ident!("set_{name}");
-        let byte_size = width.next_power_of_two();
-        let (byte_type, get_fn, set_fn) = if byte_size == 1 {
+        let byte_size = width.next_multiple_of(8);
+        let (byte_type, get_fn, set_fn) = if width == 1 {
             (
                 format_ident!("bool"),
                 format_ident!("get_bit_{storage}"),
