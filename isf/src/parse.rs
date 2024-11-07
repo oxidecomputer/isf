@@ -361,8 +361,8 @@ mod test {
     #[test]
     fn parse_charachteristics() {
         let text = read_to_string("testcase/characteristics.isf").unwrap();
-        let mut s: &str = text.as_str();
-        match parse.parse(&mut s) {
+        let s: &str = text.as_str();
+        match parse.parse(s) {
             Err(e) => {
                 panic!("{e}")
             }
@@ -379,8 +379,8 @@ mod test {
     #[test]
     fn parse_add() {
         let text = read_to_string("testcase/add.isf").unwrap();
-        let mut s: &str = text.as_str();
-        let parsed = match parse.parse(&mut s) {
+        let s: &str = text.as_str();
+        let parsed = match parse.parse(s) {
             Err(e) => {
                 panic!("{e}")
             }
@@ -463,7 +463,7 @@ mod test {
         );
         assert_eq!(parsed.instructions[0].assembly.example.len(), 2);
         assert_eq!(parsed.instructions[0].assembly.example[0], ast::AssemblyExample{
-                    doc: vec![
+                    doc: [
                       "Add the contents of registers 4 and 7 placing the result in",
                       "register 0."
                     ].join("\n"),
@@ -472,7 +472,7 @@ mod test {
         assert_eq!(
             parsed.instructions[0].assembly.example[1],
             ast::AssemblyExample {
-                doc: vec![
+                doc: [
                     "Add the contents of registers 4 and 7 sign-extending and",
                     "placing the result in register 0."
                 ]
@@ -542,8 +542,8 @@ mod test {
     #[test]
     fn parse_binop() {
         let text = read_to_string("testcase/binop.isf").unwrap();
-        let mut s: &str = text.as_str();
-        let parsed = match parse.parse(&mut s) {
+        let s = text.as_str();
+        let parsed = match parse.parse(s) {
             Err(e) => {
                 panic!("{e}")
             }
@@ -707,7 +707,7 @@ mod test {
         );
         assert_eq!(parsed.instructions[1].assembly.example.len(), 2);
         assert_eq!(parsed.instructions[1].assembly.example[0], ast::AssemblyExample{
-                    doc: vec![
+                    doc: [
                       "Add the contents of registers 4 and 7 placing the result in",
                       "register 0."
                     ].join("\n"),
@@ -716,7 +716,7 @@ mod test {
         assert_eq!(
             parsed.instructions[1].assembly.example[1],
             ast::AssemblyExample {
-                doc: vec![
+                doc: [
                     "Add the contents of registers 4 and 7 sign-extending and",
                     "placing the result in register 0."
                 ]
@@ -744,7 +744,7 @@ mod test {
         assert_eq!(
             parsed.instructions[2].assembly.example[0],
             ast::AssemblyExample {
-                doc: vec![
+                doc: [
                   "Subtract the contents of registers 4 and 7 placing the result in",
                   "register 0.",
                 ]
@@ -755,7 +755,7 @@ mod test {
         assert_eq!(
             parsed.instructions[2].assembly.example[1],
             ast::AssemblyExample {
-                doc: vec![
+                doc: [
                   "Subtract the contents of registers 4 and 7 sign-extending and",
                   "placing the result in register 0.",
                 ]
