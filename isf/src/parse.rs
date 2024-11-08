@@ -5,7 +5,7 @@ use crate::ast;
 use winnow::{
     ascii::{
         alpha1, alphanumeric1, digit1, hex_digit1, line_ending, multispace0,
-        space1, till_line_ending,
+        multispace1, till_line_ending,
     },
     combinator::{alt, cut_err, repeat, separated, trace},
     error::{ContextError, StrContext},
@@ -242,7 +242,7 @@ fn assembly_element_comma(input: &mut &str) -> PResult<ast::AssemblyElement> {
 }
 
 fn assembly_element_space(input: &mut &str) -> PResult<ast::AssemblyElement> {
-    let _ = space1.parse_next(input)?;
+    let _ = alt((s("\n"), multispace1)).parse_next(input)?;
     Ok(ast::AssemblyElement::Space)
 }
 

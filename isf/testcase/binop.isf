@@ -14,7 +14,8 @@ instruction BinOp<name, opcode> {
     sign_extend: 1
 
   assembly:
-    $name['.sx' = sign_extend] 'r'dst 'r'src1 'r'src2;
+    $name['.sx' = sign_extend]
+    'r'dst 'r'src1 'r'src2;
 
   machine:
     opcode: 7 = $opcode,
