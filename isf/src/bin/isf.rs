@@ -20,13 +20,10 @@ enum Command {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    if let Err(e) = match cli.command {
+    match cli.command {
         Command::Code => codegen(&cli.path),
         Command::Docs => docgen(&cli.path),
-    } {
-        eprintln!("{e}");
     }
-    Ok(())
 }
 
 fn codegen(path: &str) -> anyhow::Result<()> {

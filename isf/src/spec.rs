@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{self, Base, BaseParameter};
+use crate::ast::{self, Base, BaseParameter, Timing};
 use anyhow::{anyhow, Result};
 
 /// Concrete ISF specification resolved from ISF AST.
@@ -18,6 +18,7 @@ pub struct Spec {
 pub struct Instruction {
     pub doc: String,
     pub name: String,
+    pub timing: Timing,
     pub fields: Vec<Field>,
     pub assembly: Assembly,
     pub machine: Machine,
@@ -42,12 +43,14 @@ impl Instruction {
             ))?;
 
             let pmap = Self::parameter_map(base_instr, base);
+            result.resolve_timing(base_instr, &pmap)?;
             result.resolve_fields(base_instr, &pmap)?;
             result.resolve_assembly(base_instr, &pmap)?;
             result.resolve_machine(base_instr, &pmap)?;
         }
 
         let empty = HashMap::new();
+        result.resolve_timing(instr, &empty)?;
         result.resolve_fields(instr, &empty)?;
         result.resolve_assembly(instr, &empty)?;
         result.resolve_machine(instr, &empty)?;
@@ -64,6 +67,17 @@ impl Instruction {
             m.insert(param.clone(), base.parameters[i].clone());
         }
         m
+    }
+
+    fn resolve_timing(
+        &mut self,
+        instr: &ast::Instruction,
+        _pmap: &HashMap<String, ast::BaseParameter>,
+    ) -> Result<()> {
+        if let Some(ref t) = instr.timing {
+            self.timing = *t
+        }
+        Ok(())
     }
 
     fn resolve_fields(
@@ -308,6 +322,8 @@ mod test {
         // add instruction
         //
 
+        assert_eq!(spec.instructions[0].timing, Timing::Async);
+
         // fields
 
         assert_eq!(spec.instructions[0].doc, "Add values from two registers");
@@ -486,6 +502,8 @@ mod test {
         //
         // sub instruction
         //
+
+        assert_eq!(spec.instructions[1].timing, Timing::Cycle(47));
 
         // fields
 

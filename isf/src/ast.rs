@@ -30,6 +30,7 @@ pub enum Characteristic {
 pub struct Instruction {
     pub doc: String,
     pub name: String,
+    pub timing: Option<Timing>,
     pub parameters: Vec<String>,
     pub base: Option<Base>,
     pub fields: Vec<Field>,
@@ -40,6 +41,18 @@ pub struct Instruction {
 impl Instruction {
     pub fn is_base(&self) -> bool {
         !self.parameters.is_empty()
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+pub enum Timing {
+    Cycle(usize),
+    Async,
+}
+
+impl Default for Timing {
+    fn default() -> Self {
+        Self::Cycle(0)
     }
 }
 

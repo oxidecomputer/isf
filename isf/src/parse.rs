@@ -50,6 +50,15 @@ fn instruction_body(input: &mut &str) -> PResult<ast::Instruction> {
         instruction_parameters.parse_next(input).unwrap_or_default();
     let base = instruction_base.parse_next(input).ok();
     let _ = s("{").parse_next(input)?;
+    let timing = if s("timing:").parse_next(input).is_ok() {
+        Some(
+            timing
+                .context(StrContext::Label("timing"))
+                .parse_next(input)?,
+        )
+    } else {
+        None
+    };
     let fields = if s("fields:").parse_next(input).is_ok() {
         fields
             .context(StrContext::Label("fields"))
@@ -78,6 +87,7 @@ fn instruction_body(input: &mut &str) -> PResult<ast::Instruction> {
         name,
         parameters,
         base,
+        timing,
         fields,
         assembly,
         machine,
@@ -105,6 +115,22 @@ fn fields(input: &mut &str) -> PResult<Vec<ast::Field>> {
     let result = cut_err(separated(0.., field, s(','))).parse_next(input)?;
     let _ = s(',').parse_next(input);
     Ok(result)
+}
+
+fn timing(input: &mut &str) -> PResult<ast::Timing> {
+    let result = alt((cycle_timing, async_timing)).parse_next(input)?;
+    Ok(result)
+}
+
+fn cycle_timing(input: &mut &str) -> PResult<ast::Timing> {
+    let n = s(number_parser).parse_next(input)?;
+    let _ = s("cycle").parse_next(input)?;
+    Ok(ast::Timing::Cycle(n.try_into().unwrap()))
+}
+
+fn async_timing(input: &mut &str) -> PResult<ast::Timing> {
+    let _ = s("async").parse_next(input)?;
+    Ok(ast::Timing::Async)
 }
 
 fn field(input: &mut &str) -> PResult<ast::Field> {

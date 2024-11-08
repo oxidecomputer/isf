@@ -2,6 +2,7 @@ instruction_width = 32;
 
 /// Add values from two registers
 instruction Add {
+  timing: 1 cycle
   fields:
     /// The destination register
     dst: 5,

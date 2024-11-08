@@ -2,6 +2,7 @@ instruction_width = 64;
 
 /// A base instruction for binary arithmetic operations
 instruction BinOp<name, opcode> {
+  timing: async
   fields:
     /// The destination register
     dst: 5,
@@ -41,6 +42,7 @@ instruction Add: BinOp<'add', 2> {
 
 /// Subtract values from two registers
 instruction Sub: BinOp<'sub', 3> {
+  timing: 47 cycle
   assembly:
     examples:
       /// Subtract the contents of registers 4 and 7 placing the result in
