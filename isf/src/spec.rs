@@ -277,6 +277,19 @@ pub enum MachineElement {
     },
 }
 
+impl MachineElement {
+    pub fn name(&self) -> String {
+        match self {
+            Self::Field { name } => name.clone(),
+            Self::Constant {
+                name,
+                width: _,
+                value: _,
+            } => name.clone(),
+        }
+    }
+}
+
 pub fn form_spec(ast: &ast::Ast) -> Result<Spec> {
     let instruction_width = ast
         .instruction_width()

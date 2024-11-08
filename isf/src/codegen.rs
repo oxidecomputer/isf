@@ -1,7 +1,7 @@
 //! This module contains a Rust codegen implementation for ISF. The
 //! [`generate`] function produces Rust code from an ISF `[spec::Spec]`.
 
-use std::fs::read_to_string;
+use std::{collections::BTreeMap, fs::read_to_string};
 
 use crate::spec::{self, AssemblyElement, MachineElement};
 use proc_macro2::TokenStream;
@@ -220,6 +220,10 @@ pub fn generate_field_methods(
 ) -> TokenStream {
     let mut tks = TokenStream::default();
     let mut offset = 0usize;
+
+    let mut setters = BTreeMap::<String, (bool, Ident, TokenStream)>::default();
+    let mut getters = BTreeMap::<String, (Ident, TokenStream)>::default();
+
     for me in &instr.machine.layout {
         let (name, width, getter_only) = match me {
             spec::MachineElement::Field { name } => {
@@ -237,8 +241,8 @@ pub fn generate_field_methods(
                 (name.as_str(), *width, value.is_some())
             }
         };
-        let getter = format_ident!("get_{name}");
-        let setter = format_ident!("set_{name}");
+        let getter_s = format!("get_{name}");
+        let setter_s = format!("set_{name}");
         let byte_size = width.next_multiple_of(8);
         let (byte_type, get_fn, set_fn) = if width == 1 {
             (
@@ -255,26 +259,49 @@ pub fn generate_field_methods(
         } else {
             panic!("invalid field width for {name}: width");
         };
+
+        // This is last getter wins semantics, should be ok for multiple
+        // appearances of the same field in a layout as they should all
+        // be equivalent. Why do this you ask? See the X2 cmp instructions.
+        let body = quote! { isf::bits::#get_fn(self.0, #offset) };
+        getters.insert(getter_s, (byte_type.clone(), body));
+
+        let body =
+            quote! { self.0 = isf::bits::#set_fn(self.0, #offset, value); };
+        setters
+            .entry(setter_s)
+            .and_modify(|x| x.2.extend(body.clone()))
+            .or_insert((getter_only, byte_type, body));
+
+        offset += width;
+    }
+
+    for (fn_name, (byte_type, tokens)) in &getters {
+        let getter = format_ident!("{fn_name}");
         tks.extend(quote! {
             pub fn #getter(&self) -> #byte_type {
-                isf::bits::#get_fn(self.0, #offset)
+                #tokens
             }
         });
-        if getter_only {
+    }
+
+    for (fn_name, (private, byte_type, tokens)) in &setters {
+        let setter = format_ident!("{fn_name}");
+        if *private {
             tks.extend(quote! {
                 fn #setter(&mut self, value: #byte_type) {
-                    self.0 = isf::bits::#set_fn(self.0, #offset, value);
+                    #tokens
                 }
             });
         } else {
             tks.extend(quote! {
                 pub fn #setter(&mut self, value: #byte_type) {
-                    self.0 = isf::bits::#set_fn(self.0, #offset, value);
+                    #tokens
                 }
             });
         }
-        offset += width;
     }
+
     tks
 }
 
