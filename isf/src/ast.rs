@@ -82,6 +82,7 @@ pub enum AssemblyElement {
     NumberLiteral { value: u128 },
     OptionalFlag { name: String, field: String },
     Dot,
+    Comma,
     Space,
     Field { name: String },
 }

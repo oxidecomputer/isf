@@ -138,6 +138,9 @@ impl Instruction {
                 ast::AssemblyElement::Dot => {
                     self.assembly.syntax.push(AssemblyElement::Dot)
                 }
+                ast::AssemblyElement::Comma => {
+                    self.assembly.syntax.push(AssemblyElement::Comma)
+                }
                 ast::AssemblyElement::Space => {
                     self.assembly.syntax.push(AssemblyElement::Space)
                 }
@@ -238,6 +241,7 @@ pub enum AssemblyElement {
     NumberLiteral { value: u128 },
     OptionalFlag { name: String, field: String },
     Dot,
+    Comma,
     Space,
     Field { name: String },
 }

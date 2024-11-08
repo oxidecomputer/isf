@@ -161,6 +161,7 @@ fn assembly_element(input: &mut &str) -> PResult<ast::AssemblyElement> {
         assembly_element_optional_flag,
         assembly_element_identifier,
         assembly_element_dot,
+        assembly_element_comma,
         assembly_element_space,
     ))
     .parse_next(input)
@@ -177,7 +178,7 @@ fn assembly_element_expansion(
     input: &mut &str,
 ) -> PResult<ast::AssemblyElement> {
     let _ = '$'.parse_next(input)?;
-    let name = identifier_parser.parse_next(input)?;
+    let name = identifier_parser_nospace.parse_next(input)?;
     Ok(ast::AssemblyElement::Expansion { name })
 }
 
@@ -207,6 +208,11 @@ fn assembly_element_optional_flag(
 fn assembly_element_dot(input: &mut &str) -> PResult<ast::AssemblyElement> {
     let _ = ".".parse_next(input)?;
     Ok(ast::AssemblyElement::Dot)
+}
+
+fn assembly_element_comma(input: &mut &str) -> PResult<ast::AssemblyElement> {
+    let _ = ",".parse_next(input)?;
+    Ok(ast::AssemblyElement::Comma)
 }
 
 fn assembly_element_space(input: &mut &str) -> PResult<ast::AssemblyElement> {

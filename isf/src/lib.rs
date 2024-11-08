@@ -7,7 +7,12 @@ pub mod spec;
 /// Functions for interacting with instructions in assembly format.
 pub trait AssemblyInstruction: Sized {
     /// Parse an assembly instruction from text.
-    fn parse_assembly(text: &str) -> winnow::PResult<Self>;
+    fn parse_assembly(
+        text: &str,
+    ) -> Result<
+        Self,
+        winnow::error::ParseError<&str, winnow::error::ContextError>,
+    >;
     /// Emit assembly instruction in text form.
     fn emit_assembly(&self) -> String;
 }

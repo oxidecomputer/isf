@@ -67,13 +67,24 @@ pub fn generate_instruction(
 
         impl #name {
             #field_methods
+            fn parse_assembly_impl(text: &mut &str) -> winnow::PResult<Self> {
+                use winnow::Parser;
+                let input = text;
+                #assembly_parser
+            }
         }
 
         impl isf::AssemblyInstruction for #name {
-            fn parse_assembly(mut text: &str) -> winnow::PResult<Self> {
+            #[rustfmt::skip]
+            fn parse_assembly(
+                mut text: &str,
+            ) -> Result<
+                Self,
+                winnow::error::ParseError<&str, winnow::error::ContextError>,
+            > {
                 use winnow::Parser;
-                let input = &mut text;
-                #assembly_parser
+                let result = Self::parse_assembly_impl.parse(&mut text)?;
+                Ok(result)
             }
             fn emit_assembly(&self) -> String {
                 #assembly_emitter
@@ -109,7 +120,7 @@ pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
             let setter = format_ident!("set_{}", name);
             if *width == 1 {
                 tks.extend(quote! {
-                   def.#setter(#value == 0);
+                   def.#setter(#value != 0);
                 });
             } else {
                 tks.extend(quote! {
@@ -166,7 +177,9 @@ pub fn generate_assembly_emitter(instr: &spec::Instruction) -> TokenStream {
     for ae in &instr.assembly.syntax {
         match ae {
             AssemblyElement::StringLiteral { value } => {
-                tks.extend(quote! { s += #value; });
+                if !value.is_empty() {
+                    tks.extend(quote! { s += #value; });
+                }
             }
             AssemblyElement::NumberLiteral { value } => {
                 tks.extend(quote! { s += #value; });
@@ -181,6 +194,9 @@ pub fn generate_assembly_emitter(instr: &spec::Instruction) -> TokenStream {
             }
             AssemblyElement::Dot => {
                 tks.extend(quote! { s += "."; });
+            }
+            AssemblyElement::Comma => {
+                tks.extend(quote! { s += ","; });
             }
             AssemblyElement::Space => {
                 tks.extend(quote! { s += " "; });
@@ -272,9 +288,11 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
     for x in &instr.assembly.syntax {
         match x {
             spec::AssemblyElement::StringLiteral { value } => {
-                tks.extend(quote! {
-                    let _ = #value.parse_next(input)?;
-                });
+                if !value.is_empty() {
+                    tks.extend(quote! {
+                        let _ = #value.parse_next(input)?;
+                    });
+                }
             }
             spec::AssemblyElement::NumberLiteral { value } => {
                 let value = value.to_string();
@@ -296,6 +314,11 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
             spec::AssemblyElement::Dot => {
                 tks.extend(quote! {
                     let _ = '.'.parse_next(input)?;
+                });
+            }
+            spec::AssemblyElement::Comma => {
+                tks.extend(quote! {
+                    let _ = ','.parse_next(input)?;
                 });
             }
             spec::AssemblyElement::Space => {

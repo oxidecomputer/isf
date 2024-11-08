@@ -39,11 +39,9 @@ impl Add {
     pub fn set_src2(&mut self, value: u8) {
         self.0 = isf::bits::set_u5_u32(self.0, 24usize, value);
     }
-}
-impl isf::AssemblyInstruction for Add {
-    fn parse_assembly(mut text: &str) -> winnow::PResult<Self> {
+    fn parse_assembly_impl(text: &mut &str) -> winnow::PResult<Self> {
         use winnow::Parser;
-        let input = &mut text;
+        let input = text;
         let mut result = Self::default();
         let _ = "add".parse_next(input)?;
         let sign_extend: Result<
@@ -66,6 +64,16 @@ impl isf::AssemblyInstruction for Add {
         let s = winnow::ascii::digit1.parse_next(input)?;
         let src2: u128 = s.parse().unwrap();
         result.set_src2(src2.try_into().unwrap());
+        Ok(result)
+    }
+}
+impl isf::AssemblyInstruction for Add {
+    #[rustfmt::skip]
+    fn parse_assembly(
+        mut text: &str,
+    ) -> Result<Self, winnow::error::ParseError<&str, winnow::error::ContextError>> {
+        use winnow::Parser;
+        let result = Self::parse_assembly_impl.parse(&mut text)?;
         Ok(result)
     }
     fn emit_assembly(&self) -> String {
