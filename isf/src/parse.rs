@@ -276,7 +276,19 @@ fn machine_element(input: &mut &str) -> PResult<ast::MachineElement> {
 
 fn machine_element_field(input: &mut &str) -> PResult<ast::MachineElement> {
     let name = identifier_parser.parse_next(input)?;
-    Ok(ast::MachineElement::Field { name })
+    if tag('[').parse_next(input).is_ok() {
+        let begin = number_parser.parse_next(input)?;
+        let _ = ':'.parse_next(input)?;
+        let end = number_parser.parse_next(input)?;
+        let _ = ']'.parse_next(input)?;
+        Ok(ast::MachineElement::FieldSlice {
+            name,
+            begin: begin.try_into().unwrap(),
+            end: end.try_into().unwrap(),
+        })
+    } else {
+        Ok(ast::MachineElement::Field { name })
+    }
 }
 
 fn machine_element_constant(input: &mut &str) -> PResult<ast::MachineElement> {
@@ -363,6 +375,20 @@ where
     })
 }
 
+/// A helper for type gymnastics
+pub fn tag<'s, Output, ParseNext>(
+    mut parser: ParseNext,
+) -> impl Parser<&'s str, Output, ContextError>
+where
+    ParseNext: Parser<&'s str, Output, ContextError>,
+{
+    trace("tag", move |input: &mut &'s str| {
+        let result = parser.parse_next(input)?;
+        //let _ = line_comment_parser.parse_next(input);
+        Ok(result)
+    })
+}
+
 /// Parse c-style a line comment.
 pub fn line_comment_parser(input: &mut &str) -> PResult<()>
 where
@@ -387,6 +413,8 @@ pub fn number_parser(input: &mut &str) -> PResult<u128> {
 
 #[cfg(test)]
 mod test {
+    use ast::MachineElement;
+
     use super::*;
     use std::fs::read_to_string;
 
@@ -793,6 +821,72 @@ mod test {
                 ]
                 .join("\n"),
                 example: "sub.sx r0 r4 r7".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_slice_add() {
+        let text = read_to_string("testcase/slice-add.isf").unwrap();
+        let s: &str = text.as_str();
+        let parsed = match parse.parse(s) {
+            Err(e) => {
+                panic!("{e}")
+            }
+            Ok(parsed) => {
+                println!("{parsed:#?}");
+                parsed
+            }
+        };
+        assert_eq!(parsed.instructions.len(), 1);
+        assert_eq!(parsed.instructions[0].machine.layout.len(), 7);
+        assert_eq!(
+            parsed.instructions[0].machine.layout[4],
+            MachineElement::FieldSlice {
+                name: "src".to_owned(),
+                begin: 0,
+                end: 6
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[6],
+            MachineElement::FieldSlice {
+                name: "src".to_owned(),
+                begin: 7,
+                end: 13
+            }
+        );
+    }
+
+    #[test]
+    fn parse_slice_add_contiguous() {
+        let text = read_to_string("testcase/slice-add-contiguous.isf").unwrap();
+        let s: &str = text.as_str();
+        let parsed = match parse.parse(s) {
+            Err(e) => {
+                panic!("{e}")
+            }
+            Ok(parsed) => {
+                println!("{parsed:#?}");
+                parsed
+            }
+        };
+        assert_eq!(parsed.instructions.len(), 1);
+        assert_eq!(parsed.instructions[0].machine.layout.len(), 6);
+        assert_eq!(
+            parsed.instructions[0].machine.layout[4],
+            MachineElement::FieldSlice {
+                name: "src".to_owned(),
+                begin: 0,
+                end: 7
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[5],
+            MachineElement::FieldSlice {
+                name: "src".to_owned(),
+                begin: 8,
+                end: 15
             }
         );
     }

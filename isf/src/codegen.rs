@@ -75,7 +75,6 @@ pub fn generate_instruction(
         }
 
         impl isf::AssemblyInstruction for #name {
-            #[rustfmt::skip]
             fn parse_assembly(
                 mut text: &str,
             ) -> Result<
@@ -222,23 +221,37 @@ pub fn generate_field_methods(
     let mut offset = 0usize;
 
     let mut setters = BTreeMap::<String, (bool, Ident, TokenStream)>::default();
-    let mut getters = BTreeMap::<String, (Ident, TokenStream)>::default();
+    let mut getters = BTreeMap::<String, (Ident, TokenStream, bool)>::default();
 
     for me in &instr.machine.layout {
-        let (name, width, getter_only) = match me {
+        let (name, width, getter_only, slice_bounds, element_width) = match me {
             spec::MachineElement::Field { name } => {
                 let width = instr
                     .get_field(name.as_str())
                     .unwrap_or_else(|| panic!("undefined field: {name}"))
                     .width;
-                (name.as_str(), width, false)
+                (name.as_str(), width, false, None, width)
+            }
+            spec::MachineElement::FieldSlice { name, begin, end } => {
+                let element_width = (end - begin) + 1;
+                let width = instr
+                    .get_field(name.as_str())
+                    .unwrap_or_else(|| panic!("undefined field: {name}"))
+                    .width;
+                (
+                    name.as_str(),
+                    width,
+                    false,
+                    Some((begin, end)),
+                    element_width,
+                )
             }
             spec::MachineElement::Constant { name, width, value } => {
                 if name == "_" {
                     offset += width;
                     continue;
                 }
-                (name.as_str(), *width, value.is_some())
+                (name.as_str(), *width, value.is_some(), None, *width)
             }
         };
         let getter_s = format!("get_{name}");
@@ -253,8 +266,8 @@ pub fn generate_field_methods(
         } else if byte_size <= 128 {
             (
                 format_ident!("u{byte_size}"),
-                format_ident!("get_u{width}_{storage}"),
-                format_ident!("set_u{width}_{storage}"),
+                format_ident!("get_u{element_width}_{storage}"),
+                format_ident!("set_u{element_width}_{storage}"),
             )
         } else {
             panic!("invalid field width for {name}: width");
@@ -263,26 +276,70 @@ pub fn generate_field_methods(
         // This is last getter wins semantics, should be ok for multiple
         // appearances of the same field in a layout as they should all
         // be equivalent. Why do this you ask? See the X2 cmp instructions.
-        let body = quote! { isf::bits::#get_fn(self.0, #offset) };
-        getters.insert(getter_s, (byte_type.clone(), body));
+        match slice_bounds {
+            None => {
+                let body = quote! { isf::bits::#get_fn(self.0, #offset) };
+                getters.insert(getter_s, (byte_type.clone(), body, false));
+            }
+            Some((lower, _upper)) => {
+                let w = width.next_multiple_of(8);
+                let typ = format_ident!("u{w}");
+                match getters.get_mut(&getter_s) {
+                    Some(entry) => {
+                        let body = quote! {
+                            result |=
+                                (isf::bits::#get_fn(self.0, #offset) as #typ)
+                                << #lower;
+                        };
+                        entry.1.extend(body);
+                    }
+                    None => {
+                        let body = quote! {
+                            let mut result = isf::bits::#get_fn(self.0, #offset) as #typ;
+                        };
+                        getters
+                            .insert(getter_s, (byte_type.clone(), body, true));
+                    }
+                }
+            }
+        };
 
-        let body =
-            quote! { self.0 = isf::bits::#set_fn(self.0, #offset, value); };
+        let body = match slice_bounds {
+            None => {
+                quote! { self.0 = isf::bits::#set_fn(self.0, #offset, value); }
+            }
+            Some((lower, upper)) => {
+                let w = (upper - lower).next_multiple_of(8);
+                let typ = format_ident!("u{w}");
+                quote! { self.0 = isf::bits::#set_fn(
+                    self.0, #offset, (value >> #lower)
+                as #typ); }
+            }
+        };
         setters
             .entry(setter_s)
             .and_modify(|x| x.2.extend(body.clone()))
             .or_insert((getter_only, byte_type, body));
 
-        offset += width;
+        offset += element_width;
     }
 
-    for (fn_name, (byte_type, tokens)) in &getters {
+    for (fn_name, (byte_type, tokens, slice_based)) in &getters {
         let getter = format_ident!("{fn_name}");
-        tks.extend(quote! {
-            pub fn #getter(&self) -> #byte_type {
-                #tokens
-            }
-        });
+        if *slice_based {
+            tks.extend(quote! {
+                pub fn #getter(&self) -> #byte_type {
+                    #tokens
+                    result
+                }
+            });
+        } else {
+            tks.extend(quote! {
+                pub fn #getter(&self) -> #byte_type {
+                    #tokens
+                }
+            });
+        }
     }
 
     for (fn_name, (private, byte_type, tokens)) in &setters {
@@ -357,8 +414,7 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
                 let field = format_ident!("{name}");
                 let setter = format_ident!("set_{name}");
                 tks.extend(quote! {
-                    let s = winnow::ascii::digit1.parse_next(input)?;
-                    let #field: u128 = s.parse().unwrap();
+                    let #field: u128 = isf::parse::number_parser.parse_next(input)?;
                     result.#setter(#field.try_into().unwrap());
                 });
             }
@@ -377,7 +433,15 @@ mod test {
 
     #[test]
     fn cg_add() {
-        let code = generate_code("testcase/add.isf").unwrap();
+        let mut code = generate_code("testcase/add.isf").unwrap();
+        code.insert_str(0, "#![rustfmt::skip]\n");
         expectorate::assert_contents("testcase/add.rs", code.as_str());
+    }
+
+    #[test]
+    fn cg_slice_add() {
+        let mut code = generate_code("testcase/slice-add.isf").unwrap();
+        code.insert_str(0, "#![rustfmt::skip]\n");
+        expectorate::assert_contents("testcase/slice_add.rs", code.as_str());
     }
 }

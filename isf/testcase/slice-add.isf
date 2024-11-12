@@ -1,0 +1,30 @@
+instruction_width = 32;
+
+/// An instruction
+instruction SliceAdd {
+	timing: 1 cycle
+	fields:
+	    /// The destination register
+	    dst: 5,
+		/// Both sources as one field
+		src: 14,
+	    /// Set a flag that sign extends the result
+	    sign_extend: 1,
+
+	assembly:
+		'add'['.sx' = sign_extend] 'r'dst src;
+
+		examples:
+			/// Add the elements of the source field placing the result in the
+			/// dst register. Here the destination register should hold 0x165.
+			add r0 0xaabb; 
+
+	machine:
+	    opcode: 7 = 2,
+		sign_extend,
+		dst,
+	    _: 3,
+		src[0:6],
+		_: 2,
+		src[7:13]
+}

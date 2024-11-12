@@ -116,6 +116,11 @@ pub enum MachineElement {
     Field {
         name: String,
     },
+    FieldSlice {
+        name: String,
+        begin: usize,
+        end: usize,
+    },
     Constant {
         name: String,
         width: usize,

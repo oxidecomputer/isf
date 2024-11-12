@@ -197,6 +197,13 @@ impl Instruction {
                         .layout
                         .push(MachineElement::Field { name: name.clone() });
                 }
+                ast::MachineElement::FieldSlice { name, begin, end } => {
+                    self.machine.layout.push(MachineElement::FieldSlice {
+                        name: name.clone(),
+                        begin: *begin,
+                        end: *end,
+                    });
+                }
                 ast::MachineElement::Constant { name, width, value } => {
                     let value = match &value {
                         None => None,
@@ -270,6 +277,11 @@ pub enum MachineElement {
     Field {
         name: String,
     },
+    FieldSlice {
+        name: String,
+        begin: usize,
+        end: usize,
+    },
     Constant {
         name: String,
         width: usize,
@@ -281,6 +293,11 @@ impl MachineElement {
     pub fn name(&self) -> String {
         match self {
             Self::Field { name } => name.clone(),
+            Self::FieldSlice {
+                name,
+                begin: _,
+                end: _,
+            } => name.clone(),
             Self::Constant {
                 name,
                 width: _,
