@@ -413,10 +413,18 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
             spec::AssemblyElement::Field { name } => {
                 let field = format_ident!("{name}");
                 let setter = format_ident!("set_{name}");
-                tks.extend(quote! {
-                    let #field: u128 = isf::parse::number_parser.parse_next(input)?;
-                    result.#setter(#field.try_into().unwrap());
-                });
+                let field_info = instr.get_field(name).unwrap();
+                if field_info.width == 1 {
+                    tks.extend(quote! {
+                        let #field: u128 = isf::parse::number_parser.parse_next(input)?;
+                        result.#setter(#field != 0);
+                    });
+                } else {
+                    tks.extend(quote! {
+                        let #field: u128 = isf::parse::number_parser.parse_next(input)?;
+                        result.#setter(#field.try_into().unwrap());
+                    });
+                }
             }
         }
     }
