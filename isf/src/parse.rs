@@ -30,12 +30,16 @@ fn parse_characteristics(
 }
 
 fn parse_instructions(input: &mut &str) -> PResult<Vec<ast::Instruction>> {
+    lcp.parse_next(input)?;
     let result = cut_err(repeat(0.., instruction)).parse_next(input)?;
     Ok(result)
 }
 
 fn instruction(input: &mut &str) -> PResult<ast::Instruction> {
+    lcp.parse_next(input)?;
     let doc = docstring.parse_next(input)?;
+    lcp.parse_next(input)?;
+
     let _ = s("instruction").parse_next(input)?;
     let mut instr = cut_err(instruction_body)
         .context(StrContext::Label("instruction body"))
@@ -50,6 +54,7 @@ fn instruction_body(input: &mut &str) -> PResult<ast::Instruction> {
         instruction_parameters.parse_next(input).unwrap_or_default();
     let base = instruction_base.parse_next(input).ok();
     let _ = s("{").parse_next(input)?;
+    lcp.parse_next(input)?;
     let timing = if s("timing:").parse_next(input).is_ok() {
         Some(
             timing
@@ -114,11 +119,14 @@ fn instruction_base(input: &mut &str) -> PResult<ast::Base> {
 fn fields(input: &mut &str) -> PResult<Vec<ast::Field>> {
     let result = cut_err(separated(0.., field, s(','))).parse_next(input)?;
     let _ = s(',').parse_next(input);
+    lcp.parse_next(input)?;
     Ok(result)
 }
 
 fn timing(input: &mut &str) -> PResult<ast::Timing> {
+    lcp.parse_next(input)?;
     let result = alt((cycle_timing, async_timing)).parse_next(input)?;
+    lcp.parse_next(input)?;
     Ok(result)
 }
 
@@ -134,14 +142,20 @@ fn async_timing(input: &mut &str) -> PResult<ast::Timing> {
 }
 
 fn field(input: &mut &str) -> PResult<ast::Field> {
+    lcp.parse_next(input)?;
     let doc = docstring
         .context(StrContext::Label("field docstring"))
         .parse_next(input)?;
+    lcp.parse_next(input)?;
+
     let name = cut_err(s(identifier_parser))
         .context(StrContext::Label("field identifier"))
         .parse_next(input)?;
     let _ = s(":").parse_next(input)?;
     let width = s(number_parser).parse_next(input)?;
+
+    lcp.parse_next(input)?;
+
     Ok(ast::Field {
         doc,
         name,
@@ -163,7 +177,8 @@ fn docstring_line(input: &mut &str) -> PResult<String> {
 }
 
 fn assembly(input: &mut &str) -> PResult<ast::Assembly> {
-    // TODO this feels a bit gross
+    lcp.parse_next(input)?;
+    let _ = multispace0.parse_next(input)?;
     let syntax: Vec<ast::AssemblyElement> = if !input.starts_with("examples:") {
         repeat(0.., assembly_element).parse_next(input)?
     } else {
@@ -172,6 +187,7 @@ fn assembly(input: &mut &str) -> PResult<ast::Assembly> {
     if !syntax.is_empty() {
         let _ = s(';').parse_next(input)?;
     }
+    lcp.parse_next(input)?;
     let example = if s("examples:").parse_next(input).is_ok() {
         cut_err(assembly_examples).parse_next(input)?
     } else {
@@ -258,20 +274,28 @@ fn assembly_examples(input: &mut &str) -> PResult<Vec<ast::AssemblyExample>> {
 }
 
 fn assembly_example(input: &mut &str) -> PResult<ast::AssemblyExample> {
+    lcp.parse_next(input)?;
     let doc = docstring.parse_next(input)?;
+    lcp.parse_next(input)?;
     let example = take_until(1.., ";").parse_next(input)?.trim().to_owned();
     let _ = (";").parse_next(input)?;
+    lcp.parse_next(input)?;
     Ok(ast::AssemblyExample { doc, example })
 }
 
 fn machine(input: &mut &str) -> PResult<ast::Machine> {
     let layout = separated(1.., machine_element, s(',')).parse_next(input)?;
     let _ = s(',').parse_next(input);
+    lcp.parse_next(input)?;
     Ok(ast::Machine { layout })
 }
 
 fn machine_element(input: &mut &str) -> PResult<ast::MachineElement> {
-    alt((machine_element_constant, machine_element_field)).parse_next(input)
+    lcp.parse_next(input)?;
+    let result = alt((machine_element_constant, machine_element_field))
+        .parse_next(input)?;
+    lcp.parse_next(input)?;
+    Ok(result)
 }
 
 fn machine_element_field(input: &mut &str) -> PResult<ast::MachineElement> {
@@ -325,6 +349,7 @@ fn base_parameter(input: &mut &str) -> PResult<ast::BaseParameter> {
 }
 
 fn characteristic(input: &mut &str) -> PResult<ast::Characteristic> {
+    lcp.parse_next(input)?;
     // add others as alternates as they arise
     let result = instruction_width_characteristic.parse_next(input)?;
     Ok(result)
@@ -370,7 +395,6 @@ where
         let _ = multispace0.parse_next(input)?;
         let result = parser.parse_next(input)?;
         let _ = multispace0.parse_next(input)?;
-        //let _ = line_comment_parser.parse_next(input);
         Ok(result)
     })
 }
@@ -384,19 +408,21 @@ where
 {
     trace("tag", move |input: &mut &'s str| {
         let result = parser.parse_next(input)?;
-        //let _ = line_comment_parser.parse_next(input);
         Ok(result)
     })
 }
 
 /// Parse c-style a line comment.
-pub fn line_comment_parser(input: &mut &str) -> PResult<()>
-where
-{
+pub fn line_comment_parser(input: &mut &str) -> PResult<(), ContextError> {
+    let _ = multispace0.parse_next(input)?;
     let _ = ("//", none_of(['/'])).parse_next(input)?;
     let _ = till_line_ending.parse_next(input)?;
     let _ = line_ending.parse_next(input)?;
     Ok(())
+}
+
+pub fn lcp(input: &mut &str) -> PResult<(), ContextError> {
+    repeat(0.., line_comment_parser).parse_next(input)
 }
 
 pub fn number_parser(input: &mut &str) -> PResult<u128> {

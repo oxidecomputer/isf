@@ -1,37 +1,54 @@
+// more bits
 instruction_width = 32;
+// some other comment
+// about muffins
+
+// darmok and jalad
 
 /// Add values from two registers
-instruction Add {
-  timing: 1 cycle
+// hello
+instruction Add { // construct additional pylons
+  timing: 1 cycle // if add takes more than a cycle, we're in trouble
   fields:
     /// The destination register
     dst: 5,
+    // comments can go here
     /// The first source register
-    src1: 5,
+    // or here
+    src1: 5, // or here!
     /// The second source register
     src2: 5,
     /// Set a flag that sign extends the result
-    sign_extend: 1,
+    sign_extend: 1, // alpha quadrant
 
   assembly:
-    'add'['.sx' = sign_extend] 'r'dst 'r'src1 'r'src2;
+    // a comment
+    'add'['.sx' = sign_extend] 'r'dst 'r'src1 'r'src2; // ncc
+    // more commenting
 
+    // blah blah
     examples:
       /// Add the contents of registers 4 and 7 placing the result in
       /// register 0.
-      add r0 r4 r7;
+      // comments
+      add r0 r4 r7; // 1701
+      // comments comments
 
       /// Add the contents of registers 4 and 7 sign-extending and
       /// placing the result in register 0.
       add.sx r0 r4 r7;
 
   machine:
-    opcode: 7 = 2,
+    // Do you know the muffin man?
+    opcode: 7 = 2, // The muffin man?
     sign_extend,
     dst,
     _: 3,
+    // The muffin man!
+    // d
     src1,
     _: 3,
     src2,
     _: 3,
+    // yes
 }
