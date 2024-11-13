@@ -29,7 +29,7 @@ pub fn generate_code(path: &str) -> anyhow::Result<String> {
 /// methods for each field.
 pub fn generate(spec: &spec::Spec) -> TokenStream {
     let mut tokens = TokenStream::default();
-    let storage = spec.instruction_width.next_multiple_of(8);
+    let storage = uint_size(spec.instruction_width);
 
     for instruction in &spec.instructions {
         let instr_tokens = generate_instruction(storage, instruction);
@@ -256,7 +256,7 @@ pub fn generate_field_methods(
         };
         let getter_s = format!("get_{name}");
         let setter_s = format!("set_{name}");
-        let byte_size = width.next_multiple_of(8);
+        let byte_size = uint_size(width);
         let (byte_type, get_fn, set_fn) = if width == 1 {
             (
                 format_ident!("bool"),
@@ -282,7 +282,7 @@ pub fn generate_field_methods(
                 getters.insert(getter_s, (byte_type.clone(), body, false));
             }
             Some((lower, _upper)) => {
-                let w = width.next_multiple_of(8);
+                let w = uint_size(width);
                 let typ = format_ident!("u{w}");
                 match getters.get_mut(&getter_s) {
                     Some(entry) => {
@@ -309,7 +309,7 @@ pub fn generate_field_methods(
                 quote! { self.0 = isf::bits::#set_fn(self.0, #offset, value); }
             }
             Some((lower, upper)) => {
-                let w = (upper - lower).next_multiple_of(8);
+                let w = uint_size(upper - lower);
                 let typ = format_ident!("u{w}");
                 quote! { self.0 = isf::bits::#set_fn(
                     self.0, #offset, (value >> #lower)
@@ -413,7 +413,9 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
             spec::AssemblyElement::Field { name } => {
                 let field = format_ident!("{name}");
                 let setter = format_ident!("set_{name}");
-                let field_info = instr.get_field(name).unwrap();
+                let field_info = instr
+                    .get_field(name)
+                    .unwrap_or_else(|| panic!("field {name} undefined"));
                 if field_info.width == 1 {
                     tks.extend(quote! {
                         let #field: u128 = isf::parse::number_parser.parse_next(input)?;
@@ -433,6 +435,17 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
     });
 
     tks
+}
+
+fn uint_size(bits: usize) -> usize {
+    match bits {
+        x if x <= 8 => 8,
+        x if x <= 16 => 16,
+        x if x <= 32 => 32,
+        x if x <= 64 => 64,
+        x if x <= 128 => 128,
+        _ => panic!("{bits} too big"),
+    }
 }
 
 #[cfg(test)]
