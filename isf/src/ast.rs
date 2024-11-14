@@ -48,6 +48,7 @@ impl Instruction {
 pub enum Timing {
     Cycle(usize),
     Async,
+    Multi,
 }
 
 impl Default for Timing {

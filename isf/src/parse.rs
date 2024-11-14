@@ -125,7 +125,8 @@ fn fields(input: &mut &str) -> PResult<Vec<ast::Field>> {
 
 fn timing(input: &mut &str) -> PResult<ast::Timing> {
     lcp.parse_next(input)?;
-    let result = alt((cycle_timing, async_timing)).parse_next(input)?;
+    let result =
+        alt((cycle_timing, async_timing, multi_timing)).parse_next(input)?;
     lcp.parse_next(input)?;
     Ok(result)
 }
@@ -139,6 +140,11 @@ fn cycle_timing(input: &mut &str) -> PResult<ast::Timing> {
 fn async_timing(input: &mut &str) -> PResult<ast::Timing> {
     let _ = s("async").parse_next(input)?;
     Ok(ast::Timing::Async)
+}
+
+fn multi_timing(input: &mut &str) -> PResult<ast::Timing> {
+    let _ = s("multi").parse_next(input)?;
+    Ok(ast::Timing::Multi)
 }
 
 fn field(input: &mut &str) -> PResult<ast::Field> {

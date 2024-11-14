@@ -105,6 +105,28 @@ pub fn generate_instruction(
 
 pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
     let mut tks = TokenStream::default();
+
+    let num_constants = instr
+        .machine
+        .layout
+        .iter()
+        .filter(|x| {
+            matches!(
+                x,
+                MachineElement::Constant {
+                    name: _,
+                    width: _,
+                    value: _
+                },
+            )
+        })
+        .count();
+
+    if num_constants == 0 {
+        tks.extend(quote! { Self(0) });
+        return tks;
+    }
+
     tks.extend(quote! {
         let mut def = Self(0);
     });
