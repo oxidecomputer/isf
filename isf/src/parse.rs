@@ -316,6 +316,8 @@ fn machine_element_field(input: &mut &str) -> PResult<ast::MachineElement> {
             begin: begin.try_into().unwrap(),
             end: end.try_into().unwrap(),
         })
+    } else if tag('!').parse_next(input).is_ok() {
+        Ok(ast::MachineElement::FieldNegate { name })
     } else {
         Ok(ast::MachineElement::Field { name })
     }
@@ -583,7 +585,7 @@ mod test {
         );
         assert_eq!(
             parsed.instructions[0].machine.layout[1],
-            ast::MachineElement::Field {
+            ast::MachineElement::FieldNegate {
                 name: "sign_extend".to_owned(),
             }
         );

@@ -197,6 +197,11 @@ impl Instruction {
                         .layout
                         .push(MachineElement::Field { name: name.clone() });
                 }
+                ast::MachineElement::FieldNegate { name } => {
+                    self.machine.layout.push(MachineElement::FieldNegate {
+                        name: name.clone(),
+                    });
+                }
                 ast::MachineElement::FieldSlice { name, begin, end } => {
                     self.machine.layout.push(MachineElement::FieldSlice {
                         name: name.clone(),
@@ -282,6 +287,9 @@ pub enum MachineElement {
         begin: usize,
         end: usize,
     },
+    FieldNegate {
+        name: String,
+    },
     Constant {
         name: String,
         width: usize,
@@ -298,6 +306,7 @@ impl MachineElement {
                 begin: _,
                 end: _,
             } => name.clone(),
+            Self::FieldNegate { name } => name.clone(),
             Self::Constant {
                 name,
                 width: _,

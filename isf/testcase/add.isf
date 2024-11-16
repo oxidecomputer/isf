@@ -41,7 +41,7 @@ instruction Add { // construct additional pylons
   machine:
     // Do you know the muffin man?
     opcode: 7 = 2, // The muffin man?
-    sign_extend,
+    sign_extend!,
     dst,
     _: 3,
     // The muffin man!

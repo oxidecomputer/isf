@@ -246,36 +246,52 @@ pub fn generate_field_methods(
     let mut getters = BTreeMap::<String, (Ident, TokenStream, bool)>::default();
 
     for me in &instr.machine.layout {
-        let (name, width, getter_only, slice_bounds, element_width) = match me {
-            spec::MachineElement::Field { name } => {
-                let width = instr
-                    .get_field(name.as_str())
-                    .unwrap_or_else(|| panic!("undefined field: {name}"))
-                    .width;
-                (name.as_str(), width, false, None, width)
-            }
-            spec::MachineElement::FieldSlice { name, begin, end } => {
-                let element_width = (end - begin) + 1;
-                let width = instr
-                    .get_field(name.as_str())
-                    .unwrap_or_else(|| panic!("undefined field: {name}"))
-                    .width;
-                (
-                    name.as_str(),
-                    width,
-                    false,
-                    Some((begin, end)),
-                    element_width,
-                )
-            }
-            spec::MachineElement::Constant { name, width, value } => {
-                if name == "_" {
-                    offset += width;
-                    continue;
+        let (name, width, getter_only, slice_bounds, element_width, negate) =
+            match me {
+                spec::MachineElement::Field { name } => {
+                    let width = instr
+                        .get_field(name.as_str())
+                        .unwrap_or_else(|| panic!("undefined field: {name}"))
+                        .width;
+                    (name.as_str(), width, false, None, width, false)
                 }
-                (name.as_str(), *width, value.is_some(), None, *width)
-            }
-        };
+                spec::MachineElement::FieldNegate { name } => {
+                    let width = instr
+                        .get_field(name.as_str())
+                        .unwrap_or_else(|| panic!("undefined field: {name}"))
+                        .width;
+                    (name.as_str(), width, false, None, width, true)
+                }
+                spec::MachineElement::FieldSlice { name, begin, end } => {
+                    let element_width = (end - begin) + 1;
+                    let width = instr
+                        .get_field(name.as_str())
+                        .unwrap_or_else(|| panic!("undefined field: {name}"))
+                        .width;
+                    (
+                        name.as_str(),
+                        width,
+                        false,
+                        Some((begin, end)),
+                        element_width,
+                        false,
+                    )
+                }
+                spec::MachineElement::Constant { name, width, value } => {
+                    if name == "_" {
+                        offset += width;
+                        continue;
+                    }
+                    (
+                        name.as_str(),
+                        *width,
+                        value.is_some(),
+                        None,
+                        *width,
+                        false,
+                    )
+                }
+            };
         let getter_s = format!("get_{name}");
         let setter_s = format!("set_{name}");
         let byte_size = uint_size(width);
@@ -295,12 +311,19 @@ pub fn generate_field_methods(
             panic!("invalid field width for {name}: width");
         };
 
+        let negate = if negate {
+            quote! { ! }
+        } else {
+            quote! {}
+        };
+
         // This is last getter wins semantics, should be ok for multiple
         // appearances of the same field in a layout as they should all
         // be equivalent. Why do this you ask? See the X2 cmp instructions.
         match slice_bounds {
             None => {
-                let body = quote! { isf::bits::#get_fn(self.0, #offset) };
+                let body =
+                    quote! { #negate isf::bits::#get_fn(self.0, #offset) };
                 getters.insert(getter_s, (byte_type.clone(), body, false));
             }
             Some((lower, _upper)) => {
@@ -310,14 +333,14 @@ pub fn generate_field_methods(
                     Some(entry) => {
                         let body = quote! {
                             result |=
-                                (isf::bits::#get_fn(self.0, #offset) as #typ)
+                                (#negate isf::bits::#get_fn(self.0, #offset) as #typ)
                                 << #lower;
                         };
                         entry.1.extend(body);
                     }
                     None => {
                         let body = quote! {
-                            let mut result = isf::bits::#get_fn(self.0, #offset) as #typ;
+                            let mut result = #negate isf::bits::#get_fn(self.0, #offset) as #typ;
                         };
                         getters
                             .insert(getter_s, (byte_type.clone(), body, true));
@@ -328,14 +351,19 @@ pub fn generate_field_methods(
 
         let body = match slice_bounds {
             None => {
-                quote! { self.0 = isf::bits::#set_fn(self.0, #offset, value); }
+                quote! {
+                    self.0 = isf::bits::#set_fn(self.0, #offset, #negate value);
+                }
             }
             Some((lower, upper)) => {
                 let w = uint_size(upper - lower);
                 let typ = format_ident!("u{w}");
-                quote! { self.0 = isf::bits::#set_fn(
-                    self.0, #offset, (value >> #lower)
-                as #typ); }
+                quote! {
+                    self.0 = isf::bits::#set_fn(
+                        self.0, #offset, (#negate value >> #lower)
+                        as #typ
+                    );
+                }
             }
         };
         setters

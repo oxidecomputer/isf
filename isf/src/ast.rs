@@ -122,6 +122,9 @@ pub enum MachineElement {
         begin: usize,
         end: usize,
     },
+    FieldNegate {
+        name: String,
+    },
     Constant {
         name: String,
         width: usize,

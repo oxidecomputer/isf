@@ -17,7 +17,7 @@ impl Add {
         isf::bits::get_u7_u32(self.0, 0usize)
     }
     pub fn get_sign_extend(&self) -> bool {
-        isf::bits::get_bit_u32(self.0, 7usize)
+        !isf::bits::get_bit_u32(self.0, 7usize)
     }
     pub fn get_src1(&self) -> u8 {
         isf::bits::get_u5_u32(self.0, 16usize)
@@ -32,7 +32,7 @@ impl Add {
         self.0 = isf::bits::set_u7_u32(self.0, 0usize, value);
     }
     pub fn set_sign_extend(&mut self, value: bool) {
-        self.0 = isf::bits::set_bit_u32(self.0, 7usize, value);
+        self.0 = isf::bits::set_bit_u32(self.0, 7usize, !value);
     }
     pub fn set_src1(&mut self, value: u8) {
         self.0 = isf::bits::set_u5_u32(self.0, 16usize, value);
