@@ -71,6 +71,26 @@ macro_rules! gen_u32 {
 gen_u32!(u32);
 gen_u32!(u64);
 
+macro_rules! gen_u1 {
+    ($width:ident) => {
+        paste::item! {
+            pub fn [< get_u1_ $width >](reg: $width, offset: usize) -> u8 {
+                let v = [< get_u8_ $width >](reg, offset);
+                v & 0b1
+            }
+        }
+        paste::item! {
+            pub fn [< set_u1_ $width >](reg: $width, offset: usize, value: u8) -> $width {
+                let mask = !(0b1 << (offset as $width));
+                let v = ((value as $width) & 0b1) << (offset as $width);
+                (reg & mask) | v
+            }
+        }
+    };
+}
+gen_u1!(u32);
+gen_u1!(u64);
+
 macro_rules! gen_u2 {
     ($width:ident) => {
         paste::item! {
