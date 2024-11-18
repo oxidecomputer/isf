@@ -415,9 +415,15 @@ pub fn generate_field_methods(
 pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
     let mut tks = TokenStream::default();
 
-    tks.extend(quote! {
-        let mut result = Self::default();
-    });
+    if instr.fields.is_empty() {
+        tks.extend(quote! {
+            let result = Self::default();
+        });
+    } else {
+        tks.extend(quote! {
+            let mut result = Self::default();
+        });
+    }
 
     for x in &instr.assembly.syntax {
         match x {
