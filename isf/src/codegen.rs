@@ -57,7 +57,7 @@ pub fn generate_instruction(
     let generated = quote! {
         #[doc = #doc]
         #[derive(Debug, PartialEq, Eq)]
-        struct #name(#storage);
+        pub struct #name(#storage);
 
         impl Default for #name {
             fn default() -> Self {
@@ -149,6 +149,12 @@ pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
                 });
             }
         }
+        if let MachineElement::OptionalFieldAbsentTest { name } = me {
+            let setter = format_ident!("{}_mark_unset", name);
+            tks.extend(quote! {
+                def.#setter();
+            })
+        }
     }
 
     tks.extend(quote! { def });
@@ -213,6 +219,23 @@ pub fn generate_assembly_emitter(instr: &spec::Instruction) -> TokenStream {
                     }
                 });
             }
+            AssemblyElement::OptionalField { name, with_dot } => {
+                let getter = format_ident!("get_{name}");
+                if *with_dot {
+                    tks.extend(quote! {
+                        if self.#getter() != 0 {
+                            s += ".";
+                            s += #name;
+                        }
+                    });
+                } else {
+                    tks.extend(quote! {
+                        if self.#getter() != 0 {
+                            s += #name;
+                        }
+                    });
+                }
+            }
             AssemblyElement::Dot => {
                 tks.extend(quote! { s += "."; });
             }
@@ -244,56 +267,95 @@ pub fn generate_field_methods(
 
     let mut setters = BTreeMap::<String, (bool, Ident, TokenStream)>::default();
     let mut getters = BTreeMap::<String, (Ident, TokenStream, bool)>::default();
+    let mut set_indicators = BTreeMap::<String, TokenStream>::default();
+    let mut mark_unset = BTreeMap::<String, TokenStream>::default();
 
     for me in &instr.machine.layout {
-        let (name, width, getter_only, slice_bounds, element_width, negate) =
-            match me {
-                spec::MachineElement::Field { name } => {
-                    let width = instr
-                        .get_field(name.as_str())
-                        .unwrap_or_else(|| panic!("undefined field: {name}"))
-                        .width;
-                    (name.as_str(), width, false, None, width, false)
+        let (
+            name,
+            width,
+            getter_only,
+            slice_bounds,
+            element_width,
+            negate,
+            ptest,
+            atest,
+        ) = match me {
+            spec::MachineElement::Field { name } => {
+                let width = instr
+                    .get_field(name.as_str())
+                    .unwrap_or_else(|| panic!("undefined field: {name}"))
+                    .width;
+                (
+                    name.as_str(),
+                    width,
+                    false,
+                    None,
+                    width,
+                    false,
+                    false,
+                    false,
+                )
+            }
+            spec::MachineElement::FieldNegate { name } => {
+                let width = instr
+                    .get_field(name.as_str())
+                    .unwrap_or_else(|| panic!("undefined field: {name}"))
+                    .width;
+                (name.as_str(), width, false, None, width, true, false, false)
+            }
+            spec::MachineElement::OptionalFieldPresentTest { name } => {
+                let width = instr
+                    .get_field(name.as_str())
+                    .unwrap_or_else(|| panic!("undefined field: {name}"))
+                    .width;
+                (name.as_str(), width, false, None, 1, false, true, false)
+            }
+            spec::MachineElement::OptionalFieldAbsentTest { name } => {
+                let width = instr
+                    .get_field(name.as_str())
+                    .unwrap_or_else(|| panic!("undefined field: {name}"))
+                    .width;
+                (name.as_str(), width, false, None, 1, false, false, true)
+            }
+            spec::MachineElement::FieldSlice { name, begin, end } => {
+                let element_width = (end - begin) + 1;
+                let width = instr
+                    .get_field(name.as_str())
+                    .unwrap_or_else(|| panic!("undefined field: {name}"))
+                    .width;
+                (
+                    name.as_str(),
+                    width,
+                    false,
+                    Some((begin, end)),
+                    element_width,
+                    false,
+                    false,
+                    false,
+                )
+            }
+            spec::MachineElement::Constant { name, width, value } => {
+                if name == "_" {
+                    offset += width;
+                    continue;
                 }
-                spec::MachineElement::FieldNegate { name } => {
-                    let width = instr
-                        .get_field(name.as_str())
-                        .unwrap_or_else(|| panic!("undefined field: {name}"))
-                        .width;
-                    (name.as_str(), width, false, None, width, true)
-                }
-                spec::MachineElement::FieldSlice { name, begin, end } => {
-                    let element_width = (end - begin) + 1;
-                    let width = instr
-                        .get_field(name.as_str())
-                        .unwrap_or_else(|| panic!("undefined field: {name}"))
-                        .width;
-                    (
-                        name.as_str(),
-                        width,
-                        false,
-                        Some((begin, end)),
-                        element_width,
-                        false,
-                    )
-                }
-                spec::MachineElement::Constant { name, width, value } => {
-                    if name == "_" {
-                        offset += width;
-                        continue;
-                    }
-                    (
-                        name.as_str(),
-                        *width,
-                        value.is_some(),
-                        None,
-                        *width,
-                        false,
-                    )
-                }
-            };
+                (
+                    name.as_str(),
+                    *width,
+                    value.is_some(),
+                    None,
+                    *width,
+                    false,
+                    false,
+                    false,
+                )
+            }
+        };
         let getter_s = format!("get_{name}");
         let setter_s = format!("set_{name}");
+        let set_indicator_s = format!("{name}_is_set");
+        let mark_unset_s = format!("{name}_mark_unset");
         let byte_size = uint_size(width);
         let (byte_type, get_fn, set_fn) = if width == 1 {
             (
@@ -322,9 +384,20 @@ pub fn generate_field_methods(
         // be equivalent. Why do this you ask? See the X2 cmp instructions.
         match slice_bounds {
             None => {
-                let body =
-                    quote! { #negate isf::bits::#get_fn(self.0, #offset) };
-                getters.insert(getter_s, (byte_type.clone(), body, false));
+                if ptest | atest {
+                    let get_set_fn = format_ident!("get_bit_{storage}");
+                    let body =
+                        quote! { isf::bits::#get_set_fn(self.0, #offset) };
+                    set_indicators.insert(set_indicator_s, body);
+
+                    let mark_unset_fn = format_ident!("set_bit_{storage}");
+                    let body = quote! { self.0 = isf::bits::#mark_unset_fn(self.0, #offset, true); };
+                    mark_unset.insert(mark_unset_s, body);
+                } else {
+                    let body =
+                        quote! { #negate isf::bits::#get_fn(self.0, #offset) };
+                    getters.insert(getter_s, (byte_type.clone(), body, false));
+                }
             }
             Some((lower, _upper)) => {
                 let w = uint_size(width);
@@ -351,8 +424,18 @@ pub fn generate_field_methods(
 
         let body = match slice_bounds {
             None => {
-                quote! {
-                    self.0 = isf::bits::#set_fn(self.0, #offset, #negate value);
+                if ptest {
+                    quote! {
+                        self.0 = isf::bits::#set_fn(self.0, #offset, 1);
+                    }
+                } else if atest {
+                    quote! {
+                        self.0 = isf::bits::#set_fn(self.0, #offset, 0);
+                    }
+                } else {
+                    quote! {
+                        self.0 = isf::bits::#set_fn(self.0, #offset, #negate value);
+                    }
                 }
             }
             Some((lower, upper)) => {
@@ -409,6 +492,24 @@ pub fn generate_field_methods(
         }
     }
 
+    for (fn_name, tokens) in &set_indicators {
+        let set_indicator = format_ident!("{fn_name}");
+        tks.extend(quote! {
+            pub fn #set_indicator(&self) -> bool {
+                #tokens
+            }
+        })
+    }
+
+    for (fn_name, tokens) in &mark_unset {
+        let unset_marker = format_ident!("{fn_name}");
+        tks.extend(quote! {
+            fn #unset_marker(&mut self) {
+                #tokens
+            }
+        })
+    }
+
     tks
 }
 
@@ -450,6 +551,31 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
                     > = #name.parse_next(input);
                     result.#setter(#field.is_ok());
                 });
+            }
+            spec::AssemblyElement::OptionalField { name, with_dot } => {
+                let field = format_ident!("{name}");
+                let setter = format_ident!("set_{name}");
+                let body = quote! {
+                    let #field : Result<
+                        u128,
+                        winnow::error::ErrMode<winnow::error::ContextError>,
+                    > =  isf::parse::number_parser.parse_next(input);
+                    if let Ok(#field) = #field {
+                        result.#setter(#field.try_into().unwrap());
+                    }
+                };
+                if *with_dot {
+                    tks.extend(quote! {
+                        let dot_ok = isf::parse::s(".").parse_next(input).is_ok();
+                        if dot_ok {
+                            #body
+                        }
+                    });
+                } else {
+                    tks.extend(quote! {
+                        #body
+                    })
+                }
             }
             spec::AssemblyElement::Dot => {
                 tks.extend(quote! {
@@ -520,5 +646,15 @@ mod test {
         let mut code = generate_code("testcase/slice-add.isf").unwrap();
         code.insert_str(0, "#![rustfmt::skip]\n");
         expectorate::assert_contents("testcase/slice_add.rs", code.as_str());
+    }
+
+    #[test]
+    fn cg_add_field_opt() {
+        let mut code = generate_code("testcase/add-field-opt.isf").unwrap();
+        code.insert_str(0, "#![rustfmt::skip]\n");
+        expectorate::assert_contents(
+            "testcase/add_field_opt.rs",
+            code.as_str(),
+        );
     }
 }

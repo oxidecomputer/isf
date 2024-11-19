@@ -81,6 +81,7 @@ pub enum BaseParameter {
 pub enum FieldValue {
     NumericConstant(u128),
     GenericParameter(String),
+    OptionalFieldValue(Box<FieldValue>),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -95,6 +96,9 @@ pub enum AssemblyElement {
     StringLiteral { value: String },
     NumberLiteral { value: u128 },
     OptionalFlag { name: String, field: String },
+    // TODO: with_dot is a bit of a hack, it would be nice if optional parts
+    //       of assemblys could be complete syntaxes themselves.
+    OptionalField { name: String, with_dot: bool },
     Dot,
     Comma,
     Space,
@@ -113,6 +117,12 @@ pub struct Machine {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum MachineElementValue {
+    NumericConstant(u128),
+    GenericParameter(String),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MachineElement {
     Field {
         name: String,
@@ -125,9 +135,15 @@ pub enum MachineElement {
     FieldNegate {
         name: String,
     },
+    OptionalFieldPresentTest {
+        name: String,
+    },
+    OptionalFieldAbsentTest {
+        name: String,
+    },
     Constant {
         name: String,
         width: usize,
-        value: Option<FieldValue>,
+        value: Option<MachineElementValue>,
     },
 }

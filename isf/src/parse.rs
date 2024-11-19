@@ -207,6 +207,7 @@ fn assembly_element(input: &mut &str) -> PResult<ast::AssemblyElement> {
         assembly_element_expansion,
         assembly_element_string_literal,
         assembly_element_optional_flag,
+        assembly_element_optional_field,
         assembly_element_identifier,
         assembly_element_dot,
         assembly_element_comma,
@@ -251,6 +252,16 @@ fn assembly_element_optional_flag(
         name: target,
         field,
     })
+}
+
+fn assembly_element_optional_field(
+    input: &mut &str,
+) -> PResult<ast::AssemblyElement> {
+    let _ = '['.parse_next(input)?;
+    let with_dot = s('.').parse_next(input).is_ok();
+    let name = s(identifier_parser).parse_next(input)?;
+    let _ = ']'.parse_next(input)?;
+    Ok(ast::AssemblyElement::OptionalField { name, with_dot })
 }
 
 fn assembly_element_dot(input: &mut &str) -> PResult<ast::AssemblyElement> {
@@ -318,6 +329,12 @@ fn machine_element_field(input: &mut &str) -> PResult<ast::MachineElement> {
         })
     } else if tag('!').parse_next(input).is_ok() {
         Ok(ast::MachineElement::FieldNegate { name })
+    } else if tag('?').parse_next(input).is_ok() {
+        if tag('!').parse_next(input).is_ok() {
+            Ok(ast::MachineElement::OptionalFieldAbsentTest { name })
+        } else {
+            Ok(ast::MachineElement::OptionalFieldPresentTest { name })
+        }
     } else {
         Ok(ast::MachineElement::Field { name })
     }
@@ -328,7 +345,7 @@ fn machine_element_constant(input: &mut &str) -> PResult<ast::MachineElement> {
     let _ = s(':').parse_next(input)?;
     let width = s(number_parser).parse_next(input)?;
     let value = if s('=').parse_next(input).is_ok() {
-        Some(s(field_value).parse_next(input)?)
+        Some(s(machine_element_value).parse_next(input)?)
     } else {
         None
     };
@@ -339,13 +356,17 @@ fn machine_element_constant(input: &mut &str) -> PResult<ast::MachineElement> {
     })
 }
 
-fn field_value(input: &mut &str) -> PResult<ast::FieldValue> {
+fn machine_element_value(
+    input: &mut &str,
+) -> PResult<ast::MachineElementValue> {
     if let Ok(number) = number_parser.parse_next(input) {
-        return Ok(ast::FieldValue::NumericConstant(number));
+        let v = ast::MachineElementValue::NumericConstant(number);
+        return Ok(v);
     };
     let _ = s('$').parse_next(input)?;
     let name = identifier_parser.parse_next(input)?;
-    Ok(ast::FieldValue::GenericParameter(name))
+    let v = ast::MachineElementValue::GenericParameter(name);
+    Ok(v)
 }
 
 fn base_parameter(input: &mut &str) -> PResult<ast::BaseParameter> {
@@ -580,7 +601,7 @@ mod test {
             ast::MachineElement::Constant {
                 name: "opcode".to_owned(),
                 width: 7,
-                value: Some(ast::FieldValue::NumericConstant(2)),
+                value: Some(ast::MachineElementValue::NumericConstant(2)),
             }
         );
         assert_eq!(
@@ -733,7 +754,7 @@ mod test {
             ast::MachineElement::Constant {
                 name: "opcode".to_owned(),
                 width: 7,
-                value: Some(ast::FieldValue::GenericParameter(
+                value: Some(ast::MachineElementValue::GenericParameter(
                     "opcode".to_owned()
                 )),
             }

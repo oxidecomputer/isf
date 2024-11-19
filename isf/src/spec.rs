@@ -107,6 +107,32 @@ impl Instruction {
                         };
                         Some(*n)
                     }
+                    ast::FieldValue::OptionalFieldValue(v) => {
+                        match v.as_ref() {
+                            ast::FieldValue::NumericConstant(n) => Some(*n),
+                            ast::FieldValue::GenericParameter(p) => {
+                                let value =
+                                    pmap.get(p.as_str()).ok_or(anyhow!(
+                                "{}: field {}: unresolved generic prameter. \
+                                        Context: {pmap:#?}",
+                                instr.name,
+                                f.name,
+                            ))?;
+                                let BaseParameter::Number(n) = value else {
+                                    return Err(anyhow!(
+                                            "{}: field {}: fields can only be assigned \
+                                            numeric values",
+                                            instr.name,
+                                            f.name,
+                                        ));
+                                };
+                                Some(*n)
+                            }
+                            ast::FieldValue::OptionalFieldValue(_) => {
+                                panic!("nested optional fields not supported")
+                            }
+                        }
+                    }
                 },
             };
             let field = Field {
@@ -162,6 +188,12 @@ impl Instruction {
                     .assembly
                     .syntax
                     .push(AssemblyElement::Field { name: name.clone() }),
+                ast::AssemblyElement::OptionalField { name, with_dot } => {
+                    self.assembly.syntax.push(AssemblyElement::OptionalField {
+                        name: name.clone(),
+                        with_dot: *with_dot,
+                    })
+                }
                 ast::AssemblyElement::Expansion { name } => {
                     let value = pmap.get(name.as_str()).ok_or(anyhow!(
                         "{}: field {}: unresolved generic prameter. \
@@ -202,6 +234,20 @@ impl Instruction {
                         name: name.clone(),
                     });
                 }
+                ast::MachineElement::OptionalFieldPresentTest { name } => {
+                    self.machine.layout.push(
+                        MachineElement::OptionalFieldPresentTest {
+                            name: name.clone(),
+                        },
+                    );
+                }
+                ast::MachineElement::OptionalFieldAbsentTest { name } => {
+                    self.machine.layout.push(
+                        MachineElement::OptionalFieldAbsentTest {
+                            name: name.clone(),
+                        },
+                    );
+                }
                 ast::MachineElement::FieldSlice { name, begin, end } => {
                     self.machine.layout.push(MachineElement::FieldSlice {
                         name: name.clone(),
@@ -212,8 +258,10 @@ impl Instruction {
                 ast::MachineElement::Constant { name, width, value } => {
                     let value = match &value {
                         None => None,
-                        Some(ast::FieldValue::NumericConstant(v)) => Some(*v),
-                        Some(ast::FieldValue::GenericParameter(p)) => {
+                        Some(ast::MachineElementValue::NumericConstant(v)) => {
+                            Some(*v)
+                        }
+                        Some(ast::MachineElementValue::GenericParameter(p)) => {
                             let value = pmap.get(p.as_str()).ok_or(anyhow!(
                                 "{}: field {}: unresolved generic prameter. \
                                 Context: {pmap:#?}",
@@ -266,6 +314,7 @@ pub enum AssemblyElement {
     StringLiteral { value: String },
     NumberLiteral { value: u128 },
     OptionalFlag { name: String, field: String },
+    OptionalField { name: String, with_dot: bool },
     Dot,
     Comma,
     Space,
@@ -290,6 +339,12 @@ pub enum MachineElement {
     FieldNegate {
         name: String,
     },
+    OptionalFieldPresentTest {
+        name: String,
+    },
+    OptionalFieldAbsentTest {
+        name: String,
+    },
     Constant {
         name: String,
         width: usize,
@@ -307,6 +362,8 @@ impl MachineElement {
                 end: _,
             } => name.clone(),
             Self::FieldNegate { name } => name.clone(),
+            Self::OptionalFieldPresentTest { name } => name.clone(),
+            Self::OptionalFieldAbsentTest { name } => name.clone(),
             Self::Constant {
                 name,
                 width: _,

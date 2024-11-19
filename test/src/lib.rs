@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod add;
 #[cfg(test)]
+mod add_field_opt;
+#[cfg(test)]
 mod binop;
 #[cfg(test)]
 mod slice_add;

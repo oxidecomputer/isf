@@ -1,7 +1,7 @@
 #![rustfmt::skip]
 /// An instruction
 #[derive(Debug, PartialEq, Eq)]
-struct SliceAdd(u32);
+pub struct SliceAdd(u32);
 impl Default for SliceAdd {
     fn default() -> Self {
         let mut def = Self(0);

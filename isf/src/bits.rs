@@ -116,7 +116,7 @@ macro_rules! gen_u3 {
         paste::item! {
             pub fn [< get_u3_ $width >](reg: $width, offset: usize) -> u8 {
                 let v = [< get_u8_ $width >](reg, offset);
-                v & 0b1111
+                v & 0b111
             }
             pub fn [< set_u3_ $width >](reg: $width, offset: usize, value: u8) -> $width {
                 let mask = !(0b111 << (offset as $width));
