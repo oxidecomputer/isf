@@ -116,13 +116,22 @@ pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
                 MachineElement::Constant {
                     name: _,
                     width: _,
-                    value: _
+                    value: Some(_)
                 },
             )
         })
         .count();
 
-    if num_constants == 0 {
+    let num_field_absent_tests = instr
+        .machine
+        .layout
+        .iter()
+        .filter(|x| {
+            matches!(x, MachineElement::OptionalFieldAbsentTest { name: _ },)
+        })
+        .count();
+
+    if num_constants == 0 && num_field_absent_tests == 0 {
         tks.extend(quote! { Self(0) });
         return tks;
     }
