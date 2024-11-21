@@ -566,7 +566,7 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
                 let setter = format_ident!("set_{name}");
                 let body = quote! {
                     let #field : Result<
-                        u128,
+                        u64,
                         winnow::error::ErrMode<winnow::error::ContextError>,
                     > =  isf::parse::number_parser.parse_next(input);
                     if let Ok(#field) = #field {
@@ -609,12 +609,12 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
                     .unwrap_or_else(|| panic!("field {name} undefined"));
                 if field_info.width == 1 {
                     tks.extend(quote! {
-                        let #field: u128 = isf::parse::number_parser.parse_next(input)?;
+                        let #field: u64 = isf::parse::number_parser.parse_next(input)?;
                         result.#setter(#field != 0);
                     });
                 } else {
                     tks.extend(quote! {
-                        let #field: u128 = isf::parse::number_parser.parse_next(input)?;
+                        let #field: u64 = isf::parse::number_parser.parse_next(input)?;
                         result.#setter(#field.try_into().unwrap());
                     });
                 }

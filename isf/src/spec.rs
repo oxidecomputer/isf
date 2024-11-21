@@ -14,7 +14,7 @@ pub struct Spec {
 }
 
 /// Concrete instruction. Base instruction elements fully incorporated.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Instruction {
     pub doc: String,
     pub name: String,
@@ -300,7 +300,7 @@ pub struct Field {
     pub doc: String,
     pub name: String,
     pub width: usize,
-    pub value: Option<u128>,
+    pub value: Option<u64>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -312,7 +312,7 @@ pub struct Assembly {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AssemblyElement {
     StringLiteral { value: String },
-    NumberLiteral { value: u128 },
+    NumberLiteral { value: u64 },
     OptionalFlag { name: String, field: String },
     OptionalField { name: String, with_dot: bool },
     Dot,
@@ -348,7 +348,7 @@ pub enum MachineElement {
     Constant {
         name: String,
         width: usize,
-        value: Option<u128>,
+        value: Option<u64>,
     },
 }
 

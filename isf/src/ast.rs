@@ -73,13 +73,13 @@ pub struct Field {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BaseParameter {
-    Number(u128),
+    Number(u64),
     Text(String),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FieldValue {
-    NumericConstant(u128),
+    NumericConstant(u64),
     GenericParameter(String),
     OptionalFieldValue(Box<FieldValue>),
 }
@@ -94,7 +94,7 @@ pub struct Assembly {
 pub enum AssemblyElement {
     Expansion { name: String },
     StringLiteral { value: String },
-    NumberLiteral { value: u128 },
+    NumberLiteral { value: u64 },
     OptionalFlag { name: String, field: String },
     // TODO: with_dot is a bit of a hack, it would be nice if optional parts
     //       of assemblys could be complete syntaxes themselves.
@@ -118,7 +118,7 @@ pub struct Machine {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MachineElementValue {
-    NumericConstant(u128),
+    NumericConstant(u64),
     GenericParameter(String),
 }
 

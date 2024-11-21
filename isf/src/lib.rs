@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod bits;
 pub mod codegen;
+pub mod docgen;
 pub mod parse;
 pub mod spec;
 
@@ -28,6 +29,6 @@ pub trait MachineInstruction<T>: Sized {
 #[derive(Debug)]
 pub struct FieldMismatchError {
     pub field: String,
-    pub expected: u128,
-    pub found: u128,
+    pub expected: u64,
+    pub found: u64,
 }

@@ -5,7 +5,7 @@ pub struct AddOptField(u32);
 impl Default for AddOptField {
     fn default() -> Self {
         let mut def = Self(0);
-        def.set_opcode(2u128.try_into().unwrap());
+        def.set_opcode(2u64.try_into().unwrap());
         def
     }
 }
@@ -71,16 +71,16 @@ impl AddOptField {
         result.set_sign_extend(sign_extend.is_ok());
         let _ = winnow::ascii::multispace0.parse_next(input)?;
         let _ = "r".parse_next(input)?;
-        let dst: u128 = isf::parse::number_parser.parse_next(input)?;
+        let dst: u64 = isf::parse::number_parser.parse_next(input)?;
         result.set_dst(dst.try_into().unwrap());
         let _ = winnow::ascii::multispace0.parse_next(input)?;
         let _ = "r".parse_next(input)?;
-        let src1: u128 = isf::parse::number_parser.parse_next(input)?;
+        let src1: u64 = isf::parse::number_parser.parse_next(input)?;
         result.set_src1(src1.try_into().unwrap());
         let dot_ok = isf::parse::s(".").parse_next(input).is_ok();
         if dot_ok {
             let src1_sel: Result<
-                u128,
+                u64,
                 winnow::error::ErrMode<winnow::error::ContextError>,
             > = isf::parse::number_parser.parse_next(input);
             if let Ok(src1_sel) = src1_sel {
@@ -88,13 +88,13 @@ impl AddOptField {
             }
         }
         let _ = winnow::ascii::multispace0.parse_next(input)?;
-        let a: Result<u128, winnow::error::ErrMode<winnow::error::ContextError>> = isf::parse::number_parser
+        let a: Result<u64, winnow::error::ErrMode<winnow::error::ContextError>> = isf::parse::number_parser
             .parse_next(input);
         if let Ok(a) = a {
             result.set_a(a.try_into().unwrap());
         }
         let _ = winnow::ascii::multispace0.parse_next(input)?;
-        let b: u128 = isf::parse::number_parser.parse_next(input)?;
+        let b: u64 = isf::parse::number_parser.parse_next(input)?;
         result.set_b(b.try_into().unwrap());
         Ok(result)
     }
@@ -136,7 +136,7 @@ impl isf::MachineInstruction<u32> for AddOptField {
     fn parse_machine(data: u32) -> Result<Self, isf::FieldMismatchError> {
         let perhaps = Self(data);
         let found = perhaps.get_opcode().try_into().unwrap();
-        let expected = 2u128;
+        let expected = 2u64;
         if found != expected {
             return Err(isf::FieldMismatchError {
                 field: "opcode".to_owned(),

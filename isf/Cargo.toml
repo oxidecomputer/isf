@@ -13,4 +13,6 @@ quote.workspace = true
 syn.workspace = true
 winnow.workspace = true
 clap.workspace = true
+liquid.workspace = true
 paste = "1.0.15"
+serde.workspace = true

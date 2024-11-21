@@ -454,14 +454,14 @@ pub fn lcp(input: &mut &str) -> PResult<(), ContextError> {
     repeat(0.., line_comment_parser).parse_next(input)
 }
 
-pub fn number_parser(input: &mut &str) -> PResult<u128> {
+pub fn number_parser(input: &mut &str) -> PResult<u64> {
     if s("0x").parse_next(input).is_ok() {
         let s = hex_digit1.parse_next(input)?;
-        let n = u128::from_str_radix(s, 16).unwrap();
+        let n = u64::from_str_radix(s, 16).unwrap();
         Ok(n)
     } else {
         let s = digit1.parse_next(input)?;
-        let n: u128 = s.parse().unwrap();
+        let n: u64 = s.parse().unwrap();
         Ok(n)
     }
 }
