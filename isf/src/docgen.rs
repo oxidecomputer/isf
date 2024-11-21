@@ -50,25 +50,47 @@ fn machine_element_table(i: &spec::Instruction) -> Vec<(usize, usize, String)> {
         match e {
             spec::MachineElement::Field { name } => {
                 let f = i.fields.iter().find(|x| &x.name == name).unwrap();
-                result.push((idx, f.width, name.clone()));
+                result.push((
+                    idx,
+                    f.width,
+                    format!("<span class=\"field\">{}</span>", name.clone()),
+                ));
                 idx += f.width;
             }
             spec::MachineElement::FieldSlice { name, begin, end } => {
                 let w = (end - begin) + 1;
-                result.push((idx, w, format!("{name}[{begin}:{end}]")));
+                result.push((
+                    idx,
+                    w,
+                    format!(
+                        "<span class=\"field\">{name}</span>[{begin}:{end}]"
+                    ),
+                ));
                 idx += w;
             }
             spec::MachineElement::FieldNegate { name } => {
                 let f = i.fields.iter().find(|x| &x.name == name).unwrap();
-                result.push((idx, f.width, format!("{name}!")));
+                result.push((
+                    idx,
+                    f.width,
+                    format!("<span class=\"field\">{name}</span>!"),
+                ));
                 idx += f.width;
             }
             spec::MachineElement::OptionalFieldPresentTest { name } => {
-                result.push((idx, 1, format!("{name}?")));
+                result.push((
+                    idx,
+                    1,
+                    format!("<span class=\"field\">{name}</span>?"),
+                ));
                 idx += 1;
             }
             spec::MachineElement::OptionalFieldAbsentTest { name } => {
-                result.push((idx, 1, format!("{name}?!")));
+                result.push((
+                    idx,
+                    1,
+                    format!("<span class=\"field\">{name}</span>?!"),
+                ));
                 idx += 1;
             }
             spec::MachineElement::Constant { name, width, value } => {
@@ -91,19 +113,22 @@ fn assembly_string(a: &Assembly) -> String {
     for x in &a.syntax {
         match x {
             spec::AssemblyElement::StringLiteral { value } => {
-                s += &format!("'{value}'");
+                s += &format!("<span class=\"constant\">'{value}'</span>");
             }
             spec::AssemblyElement::NumberLiteral { value } => {
                 s += &value.to_string();
             }
             spec::AssemblyElement::OptionalFlag { name, field } => {
-                s += &format!("['{}' = {}]", name, field);
+                s += &format!(
+                    "[<span class=\"constant\">'{}'</span> = <span class=\"field\">{}</span>]",
+                    name, field
+                );
             }
             spec::AssemblyElement::OptionalField { name, with_dot } => {
                 if *with_dot {
-                    s += &format!("[.{}]", name);
+                    s += &format!("[.<span class=\"field\">{}</span>]", name);
                 } else {
-                    s += &format!("[{}]", name);
+                    s += &format!("[<span class=\"field\">{}</span>]", name);
                 }
             }
             spec::AssemblyElement::Dot => {
@@ -116,12 +141,14 @@ fn assembly_string(a: &Assembly) -> String {
                 s += " ";
             }
             spec::AssemblyElement::Field { name } => {
-                s += name;
+                s += &format!("<span class=\"field\">{name}</span>");
             }
         }
     }
     // merge consecutive string literals
-    s.replace("''", "")
+    let s = s.replace("''", "");
+    let s = s.trim();
+    s.to_owned()
 }
 
 /// Generate HTML documentation for an ISF file at the given path.
