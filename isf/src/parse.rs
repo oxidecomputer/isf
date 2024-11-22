@@ -176,10 +176,11 @@ fn docstring(input: &mut &str) -> PResult<String> {
 }
 
 fn docstring_line(input: &mut &str) -> PResult<String> {
-    let _ = s("///").parse_next(input)?;
+    let _ = multispace0.parse_next(input)?;
+    let _ = "///".parse_next(input)?;
     let ds = till_line_ending.parse_next(input)?;
     let _ = line_ending.parse_next(input)?;
-    Ok(ds.to_owned())
+    Ok(ds.trim().to_owned())
 }
 
 fn assembly(input: &mut &str) -> PResult<ast::Assembly> {

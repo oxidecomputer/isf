@@ -1,4 +1,5 @@
 use crate::spec::{self, Assembly};
+use comrak::{markdown_to_html, Options};
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use winnow::Parser;
@@ -10,17 +11,33 @@ struct Instruction {
     pub timing: String,
     pub fields: Vec<Field>,
     pub assembly: String,
+    pub examples: Vec<Example>,
     pub machine: Vec<(usize, usize, String)>,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize)]
+struct Example {
+    pub doc: String,
+    pub code: String,
 }
 
 impl From<spec::Instruction> for Instruction {
     fn from(value: spec::Instruction) -> Self {
         Instruction {
-            doc: value.doc.clone(),
+            doc: markdown_to_html(&value.doc, &Options::default()),
             name: value.name.clone(),
             timing: format!("{:?}", value.timing),
             fields: value.fields.clone().into_iter().map(Into::into).collect(),
             assembly: assembly_string(&value.assembly),
+            examples: value
+                .assembly
+                .example
+                .iter()
+                .map(|x| Example {
+                    doc: markdown_to_html(&x.doc, &Options::default()),
+                    code: x.example.clone(),
+                })
+                .collect(),
             machine: machine_element_table(&value),
         }
     }

@@ -14,8 +14,11 @@ html {
 body {
   margin: 0;
 }
-pre {
+pre, code {
   font-family: ui-monospace;
+}
+code {
+  font-size: 0.9em;
 }
 table pre {
   margin: 0;
@@ -178,6 +181,12 @@ input:checked ~ aside {
 
     <h3>Assembly</h3>
     <pre class="asm">{{i.assembly}}</pre>
+
+    <h3>Examples</h3>
+    {% for e in i.examples %}
+      <p>{{e.doc}}</p>
+      <pre class="asm">{{e.code}}</pre>
+    {% endfor %}
 
     <h3>Fields</h3>
     <table class="tbl">
