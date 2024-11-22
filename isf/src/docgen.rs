@@ -26,7 +26,7 @@ impl From<spec::Instruction> for Instruction {
         Instruction {
             doc: markdown_to_html(&value.doc, &Options::default()),
             name: value.name.clone(),
-            timing: format!("{:?}", value.timing),
+            timing: format!("{}", value.timing),
             fields: value.fields.clone().into_iter().map(Into::into).collect(),
             assembly: assembly_string(&value.assembly),
             examples: value

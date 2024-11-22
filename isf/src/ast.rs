@@ -51,6 +51,17 @@ pub enum Timing {
     Multi,
 }
 
+impl std::fmt::Display for Timing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Timing::Cycle(1) => write!(f, "1 cycle"),
+            Timing::Cycle(n) => write!(f, "{} cycles", n),
+            Timing::Async => write!(f, "async"),
+            Timing::Multi => write!(f, "multiple cycles"),
+        }
+    }
+}
+
 impl Default for Timing {
     fn default() -> Self {
         Self::Cycle(0)
