@@ -447,8 +447,8 @@ pub fn generate_field_methods(
                     }
                 }
             }
-            Some((lower, upper)) => {
-                let w = uint_size(upper - lower);
+            Some((lower, _upper)) => {
+                let w = uint_size(element_width);
                 let typ = format_ident!("u{w}");
                 quote! {
                     self.0 = isf::bits::#set_fn(
