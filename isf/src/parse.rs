@@ -32,6 +32,7 @@ fn parse_characteristics(
 fn parse_instructions(input: &mut &str) -> PResult<Vec<ast::Instruction>> {
     lcp.parse_next(input)?;
     let result = cut_err(repeat(0.., instruction)).parse_next(input)?;
+    lcp.parse_next(input)?;
     Ok(result)
 }
 
