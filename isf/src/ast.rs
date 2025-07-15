@@ -5,6 +5,7 @@
 #[derive(Debug, Default)]
 pub struct Ast {
     pub characteristics: Vec<Characteristic>,
+    pub classes: Vec<Class>,
     pub instructions: Vec<Instruction>,
 }
 
@@ -28,6 +29,13 @@ impl Ast {
 #[derive(PartialEq, Eq, Debug)]
 pub enum Characteristic {
     InstructionWidth(usize),
+}
+
+#[derive(Debug, Clone)]
+pub struct Class {
+    pub doc: String,
+    pub name: String,
+    pub width: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -82,8 +90,14 @@ pub struct Base {
 pub struct Field {
     pub doc: String,
     pub name: String,
-    pub width: usize,
+    pub ty: FieldType,
     pub value: Option<FieldValue>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum FieldType {
+    FixedWidth(usize),
+    Class(String),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

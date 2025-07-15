@@ -15,6 +15,14 @@ use anyhow::{anyhow, Result};
 pub struct Spec {
     pub instruction_width: usize,
     pub instructions: Vec<Instruction>,
+    pub classes: HashMap<String, Class>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Class {
+    pub doc: String,
+    pub name: String,
+    pub width: usize,
 }
 
 /// Concrete instruction. Base instruction elements fully incorporated.
@@ -32,7 +40,11 @@ impl Instruction {
     pub(crate) fn get_field<'a>(&'a self, name: &str) -> Option<&'a Field> {
         self.fields.iter().find(|f| f.name == name)
     }
-    fn resolve(instr: &ast::Instruction, ast: &ast::Ast) -> Result<Self> {
+    fn resolve(
+        instr: &ast::Instruction,
+        ast: &ast::Ast,
+        classes: &HashMap<String, Class>,
+    ) -> Result<Self> {
         let mut result = Self {
             doc: instr.doc.clone(),
             name: instr.name.clone(),
@@ -48,14 +60,14 @@ impl Instruction {
 
             let pmap = Self::parameter_map(base_instr, base);
             result.resolve_timing(base_instr, &pmap)?;
-            result.resolve_fields(base_instr, &pmap)?;
+            result.resolve_fields(base_instr, &pmap, classes)?;
             result.resolve_assembly(base_instr, &pmap)?;
             result.resolve_machine(base_instr, &pmap)?;
         }
 
         let empty = HashMap::new();
         result.resolve_timing(instr, &empty)?;
-        result.resolve_fields(instr, &empty)?;
+        result.resolve_fields(instr, &empty, classes)?;
         result.resolve_assembly(instr, &empty)?;
         result.resolve_machine(instr, &empty)?;
 
@@ -88,6 +100,7 @@ impl Instruction {
         &mut self,
         instr: &ast::Instruction,
         pmap: &HashMap<String, ast::BaseParameter>,
+        classes: &HashMap<String, Class>,
     ) -> Result<()> {
         for f in &instr.fields {
             let value = match &f.value {
@@ -139,10 +152,24 @@ impl Instruction {
                     }
                 },
             };
+            let (width, class) = match &f.ty {
+                ast::FieldType::FixedWidth(w) => (*w, None),
+                ast::FieldType::Class(s) => {
+                    let c = classes.get(s).ok_or_else(|| {
+                        anyhow!(
+                            "{}: field {} class {s} not found",
+                            instr.name,
+                            f.name
+                        )
+                    })?;
+                    (c.width, Some(s.clone()))
+                }
+            };
             let field = Field {
                 doc: f.doc.clone(),
                 name: f.name.clone(),
-                width: f.width,
+                width,
+                class,
                 value,
             };
             self.fields.push(field);
@@ -296,13 +323,24 @@ impl Instruction {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field {
     pub doc: String,
     pub name: String,
     pub width: usize,
+    pub class: Option<String>,
     pub value: Option<u64>,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum FieldType {
+    FixedWidth(usize),
+    Class(ClassIndex),
+}
+
+/// Index of a class in [`Spec::classes`]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub struct ClassIndex(usize);
 
 #[derive(Debug, Default, Clone)]
 pub struct Assembly {
@@ -385,17 +423,34 @@ pub fn form_spec(ast: &ast::Ast) -> Result<Spec> {
 
     let mut instructions = Vec::new();
 
+    // Build class lookup maps
+    let classes = ast
+        .classes
+        .iter()
+        .map(|c| {
+            (
+                c.name.clone(),
+                Class {
+                    name: c.name.clone(),
+                    doc: c.doc.clone(),
+                    width: c.width,
+                },
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
     for ast_instr in &ast.instructions {
         if ast_instr.is_base() {
             continue;
         }
-        let instr = Instruction::resolve(ast_instr, ast)?;
+        let instr = Instruction::resolve(ast_instr, ast, &classes)?;
         instructions.push(instr);
     }
 
     Ok(Spec {
         instruction_width,
         instructions,
+        classes,
     })
 }
 
