@@ -48,7 +48,7 @@ pub fn generate_instruction(
     instr: &spec::Instruction,
 ) -> TokenStream {
     let name = format_ident!("{}", instr.name);
-    let storage = format_ident!("u{}", storage);
+    let storage = format_ident!("u{storage}");
 
     let default_impl = generate_default_impl(instr);
     let field_methods = generate_field_methods(instr, &storage);
@@ -151,7 +151,7 @@ pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
             value: Some(value),
         } = me
         {
-            let setter = format_ident!("set_{}", name);
+            let setter = format_ident!("set_{name}");
             if *width == 1 {
                 tks.extend(quote! {
                    def.#setter(#value != 0);
@@ -163,7 +163,7 @@ pub fn generate_default_impl(instr: &spec::Instruction) -> TokenStream {
             }
         }
         if let MachineElement::OptionalFieldAbsentTest { name } = me {
-            let setter = format_ident!("{}_mark_unset", name);
+            let setter = format_ident!("{name}_mark_unset");
             tks.extend(quote! {
                 def.#setter();
             })

@@ -96,7 +96,7 @@ impl Instruction {
                     ast::FieldValue::NumericConstant(n) => Some(*n),
                     ast::FieldValue::GenericParameter(p) => {
                         let value = pmap.get(p.as_str()).ok_or(anyhow!(
-                            "{}: field {}: unresolved generic prameter. \
+                            "{}: field {}: unresolved generic parameter. \
                             Context: {pmap:#?}",
                             instr.name,
                             f.name,
@@ -117,18 +117,18 @@ impl Instruction {
                             ast::FieldValue::GenericParameter(p) => {
                                 let value =
                                     pmap.get(p.as_str()).ok_or(anyhow!(
-                                "{}: field {}: unresolved generic prameter. \
-                                        Context: {pmap:#?}",
-                                instr.name,
-                                f.name,
-                            ))?;
+                                        "{}: field {}: unresolved generic \
+                                        parameter. Context: {pmap:#?}",
+                                        instr.name,
+                                        f.name,
+                                    ))?;
                                 let BaseParameter::Number(n) = value else {
                                     return Err(anyhow!(
-                                            "{}: field {}: fields can only be assigned \
-                                            numeric values",
-                                            instr.name,
-                                            f.name,
-                                        ));
+                                        "{}: field {}: fields can only be \
+                                        assigned numeric values",
+                                        instr.name,
+                                        f.name,
+                                    ));
                                 };
                                 Some(*n)
                             }
@@ -200,10 +200,9 @@ impl Instruction {
                 }
                 ast::AssemblyElement::Expansion { name } => {
                     let value = pmap.get(name.as_str()).ok_or(anyhow!(
-                        "{}: field {}: unresolved generic prameter. \
+                        "{}: field {name}: unresolved generic parameter. \
                         Context: {pmap:#?}",
                         instr.name,
-                        name,
                     ))?;
                     match value {
                         BaseParameter::Text(v) => self.assembly.syntax.push(
@@ -267,20 +266,18 @@ impl Instruction {
                         }
                         Some(ast::MachineElementValue::GenericParameter(p)) => {
                             let value = pmap.get(p.as_str()).ok_or(anyhow!(
-                                "{}: field {}: unresolved generic prameter. \
-                                Context: {pmap:#?}",
+                                "{}: field {name}: unresolved generic \
+                                parameter. Context: {pmap:#?}",
                                 instr.name,
-                                name,
                             ))?;
                             match value {
                                 BaseParameter::Number(n) => Some(*n),
                                 BaseParameter::Text(_) => {
                                     return Err(anyhow!(
-                                        "{}: machine_layout {}: layout \
+                                        "{}: machine_layout {p}: layout \
                                         positions can only be assigned numeric \
                                         values",
                                         instr.name,
-                                        p,
                                     ));
                                 }
                             }
