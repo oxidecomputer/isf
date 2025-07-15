@@ -52,6 +52,7 @@ pub struct Field {
     pub doc: String,
     pub name: String,
     pub width: usize,
+    pub class: Option<String>,
 }
 
 impl From<spec::Field> for Field {
@@ -60,6 +61,7 @@ impl From<spec::Field> for Field {
             doc: value.doc,
             name: value.name,
             width: value.width,
+            class: value.class.clone(),
         }
     }
 }

@@ -21,6 +21,7 @@ use winnow::{
 pub fn parse(input: &mut &str) -> PResult<ast::Ast> {
     let spec = ast::Ast {
         characteristics: parse_characteristics.parse_next(input)?,
+        classes: parse_classes.parse_next(input)?,
         instructions: parse_instructions.parse_next(input)?,
     };
     Ok(spec)
@@ -31,6 +32,40 @@ fn parse_characteristics(
 ) -> PResult<Vec<ast::Characteristic>> {
     let result = repeat(0.., characteristic).parse_next(input)?;
     Ok(result)
+}
+
+fn parse_classes(input: &mut &str) -> PResult<Vec<ast::Class>> {
+    lcp.parse_next(input)?;
+    let result = cut_err(repeat(0.., class)).parse_next(input)?;
+    lcp.parse_next(input)?;
+    Ok(result)
+}
+
+fn class(input: &mut &str) -> PResult<ast::Class> {
+    lcp.parse_next(input)?;
+    let doc = docstring.parse_next(input)?;
+    lcp.parse_next(input)?;
+
+    let _ = s("class").parse_next(input)?;
+    let mut instr = cut_err(class_body)
+        .context(StrContext::Label("class body"))
+        .parse_next(input)?;
+    instr.doc = doc;
+    Ok(instr)
+}
+
+fn class_body(input: &mut &str) -> PResult<ast::Class> {
+    let name = identifier_parser.parse_next(input)?;
+    let _ = s("{").parse_next(input)?;
+    lcp.parse_next(input)?;
+    let _ = s("width:").parse_next(input)?;
+    let width = s(number_parser).parse_next(input)?;
+    let _ = s("}").parse_next(input)?;
+    Ok(ast::Class {
+        doc: String::default(),
+        name,
+        width: width.try_into().expect("width as usize"),
+    })
 }
 
 fn parse_instructions(input: &mut &str) -> PResult<Vec<ast::Instruction>> {
@@ -163,14 +198,22 @@ fn field(input: &mut &str) -> PResult<ast::Field> {
         .context(StrContext::Label("field identifier"))
         .parse_next(input)?;
     let _ = s(":").parse_next(input)?;
-    let width = s(number_parser).parse_next(input)?;
+    let ty = s(alt((
+        number_parser.map(|width| {
+            ast::FieldType::FixedWidth(
+                width.try_into().expect("width as usize"),
+            )
+        }),
+        identifier_parser.map(ast::FieldType::Class),
+    )))
+    .parse_next(input)?;
 
     lcp.parse_next(input)?;
 
     Ok(ast::Field {
         doc,
         name,
-        width: width.try_into().expect("width as usize"),
+        ty,
         value: None, //TODO
     })
 }
@@ -518,7 +561,7 @@ mod test {
             ast::Field {
                 doc: "The destination register".to_owned(),
                 name: "dst".to_owned(),
-                width: 5,
+                ty: ast::FieldType::FixedWidth(5),
                 value: None,
             }
         );
@@ -527,7 +570,7 @@ mod test {
             ast::Field {
                 doc: "The first source register".to_owned(),
                 name: "src1".to_owned(),
-                width: 5,
+                ty: ast::FieldType::FixedWidth(5),
                 value: None,
             }
         );
@@ -536,7 +579,7 @@ mod test {
             ast::Field {
                 doc: "The second source register".to_owned(),
                 name: "src2".to_owned(),
-                width: 5,
+                ty: ast::FieldType::FixedWidth(5),
                 value: None,
             }
         );
@@ -545,7 +588,175 @@ mod test {
             ast::Field {
                 doc: "Set a flag that sign extends the result".to_owned(),
                 name: "sign_extend".to_owned(),
-                width: 1,
+                ty: ast::FieldType::FixedWidth(1),
+                value: None,
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].assembly.syntax,
+            vec![
+                ast::AssemblyElement::StringLiteral {
+                    value: "add".to_owned()
+                },
+                ast::AssemblyElement::OptionalFlag {
+                    name: ".sx".to_owned(),
+                    field: "sign_extend".to_owned()
+                },
+                ast::AssemblyElement::Space,
+                ast::AssemblyElement::StringLiteral {
+                    value: "r".to_owned(),
+                },
+                ast::AssemblyElement::Field {
+                    name: "dst".to_owned()
+                },
+                ast::AssemblyElement::Space,
+                ast::AssemblyElement::StringLiteral {
+                    value: "r".to_owned(),
+                },
+                ast::AssemblyElement::Field {
+                    name: "src1".to_owned()
+                },
+                ast::AssemblyElement::Space,
+                ast::AssemblyElement::StringLiteral {
+                    value: "r".to_owned(),
+                },
+                ast::AssemblyElement::Field {
+                    name: "src2".to_owned()
+                },
+            ]
+        );
+        assert_eq!(parsed.instructions[0].assembly.example.len(), 2);
+        assert_eq!(parsed.instructions[0].assembly.example[0], ast::AssemblyExample{
+                    doc: [
+                      "Add the contents of registers 4 and 7 placing the result in",
+                      "register 0."
+                    ].join("\n"),
+                    example: "add r0 r4 r7".to_owned(),
+                });
+        assert_eq!(
+            parsed.instructions[0].assembly.example[1],
+            ast::AssemblyExample {
+                doc: [
+                    "Add the contents of registers 4 and 7 sign-extending and",
+                    "placing the result in register 0."
+                ]
+                .join("\n"),
+                example: "add.sx r0 r4 r7".to_owned(),
+            }
+        );
+        assert_eq!(parsed.instructions[0].machine.layout.len(), 8);
+        assert_eq!(
+            parsed.instructions[0].machine.layout[0],
+            ast::MachineElement::Constant {
+                name: "opcode".to_owned(),
+                width: 7,
+                value: Some(ast::MachineElementValue::NumericConstant(2)),
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[1],
+            ast::MachineElement::FieldNegate {
+                name: "sign_extend".to_owned(),
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[2],
+            ast::MachineElement::Field {
+                name: "dst".to_owned(),
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[3],
+            ast::MachineElement::Constant {
+                name: "_".to_owned(),
+                width: 3,
+                value: None,
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[4],
+            ast::MachineElement::Field {
+                name: "src1".to_owned(),
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[5],
+            ast::MachineElement::Constant {
+                name: "_".to_owned(),
+                width: 3,
+                value: None,
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[6],
+            ast::MachineElement::Field {
+                name: "src2".to_owned(),
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].machine.layout[7],
+            ast::MachineElement::Constant {
+                name: "_".to_owned(),
+                width: 3,
+                value: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_add_reg() {
+        let text = read_to_string("testcase/add-reg.isf").unwrap();
+        let s: &str = text.as_str();
+        let parsed = match parse.parse(s) {
+            Err(e) => {
+                panic!("{e}")
+            }
+            Ok(parsed) => {
+                println!("{parsed:#?}");
+                parsed
+            }
+        };
+        assert_eq!(parsed.classes.len(), 1);
+        assert_eq!(parsed.classes[0].width, 2);
+        assert_eq!(parsed.classes[0].doc, "General-purpose register");
+        assert_eq!(parsed.classes[0].name, "Register");
+
+        assert_eq!(parsed.instructions.len(), 1);
+        assert_eq!(parsed.instructions[0].doc, "Add values from two registers");
+        assert_eq!(parsed.instructions[0].fields.len(), 4);
+        assert_eq!(
+            parsed.instructions[0].fields[0],
+            ast::Field {
+                doc: "The destination register".to_owned(),
+                name: "dst".to_owned(),
+                ty: ast::FieldType::Class("Register".to_owned()),
+                value: None,
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].fields[1],
+            ast::Field {
+                doc: "The first source register".to_owned(),
+                name: "src1".to_owned(),
+                ty: ast::FieldType::Class("Register".to_owned()),
+                value: None,
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].fields[2],
+            ast::Field {
+                doc: "The second source register".to_owned(),
+                name: "src2".to_owned(),
+                ty: ast::FieldType::Class("Register".to_owned()),
+                value: None,
+            }
+        );
+        assert_eq!(
+            parsed.instructions[0].fields[3],
+            ast::Field {
+                doc: "Set a flag that sign extends the result".to_owned(),
+                name: "sign_extend".to_owned(),
+                ty: ast::FieldType::FixedWidth(1),
                 value: None,
             }
         );
@@ -690,7 +901,7 @@ mod test {
             ast::Field {
                 doc: "The destination register".to_owned(),
                 name: "dst".to_owned(),
-                width: 5,
+                ty: ast::FieldType::FixedWidth(5),
                 value: None,
             }
         );
@@ -699,7 +910,7 @@ mod test {
             ast::Field {
                 doc: "The first source register".to_owned(),
                 name: "src1".to_owned(),
-                width: 5,
+                ty: ast::FieldType::FixedWidth(5),
                 value: None,
             }
         );
@@ -708,7 +919,7 @@ mod test {
             ast::Field {
                 doc: "The second source register".to_owned(),
                 name: "src2".to_owned(),
-                width: 5,
+                ty: ast::FieldType::FixedWidth(5),
                 value: None,
             }
         );
@@ -717,7 +928,7 @@ mod test {
             ast::Field {
                 doc: "Set a flag that sign extends the result".to_owned(),
                 name: "sign_extend".to_owned(),
-                width: 1,
+                ty: ast::FieldType::FixedWidth(1),
                 value: None,
             }
         );
