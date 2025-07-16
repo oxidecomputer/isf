@@ -74,7 +74,7 @@ fn machine_element_table(i: &spec::Instruction) -> Vec<(usize, usize, String)> {
                 result.push((
                     idx,
                     f.width,
-                    format!("<span class=\"field\">{}</span>", name.clone()),
+                    format!("<span class=\"field\">{name}</span>"),
                 ));
                 idx += f.width;
             }
@@ -141,15 +141,14 @@ fn assembly_string(a: &Assembly) -> String {
             }
             spec::AssemblyElement::OptionalFlag { name, field } => {
                 s += &format!(
-                    "[<span class=\"constant\">'{}'</span> = <span class=\"field\">{}</span>]",
-                    name, field
+                    "[<span class=\"constant\">'{name}'</span> = <span class=\"field\">{field}</span>]",
                 );
             }
             spec::AssemblyElement::OptionalField { name, with_dot } => {
                 if *with_dot {
-                    s += &format!("[.<span class=\"field\">{}</span>]", name);
+                    s += &format!("[.<span class=\"field\">{name}</span>]");
                 } else {
-                    s += &format!("[<span class=\"field\">{}</span>]", name);
+                    s += &format!("[<span class=\"field\">{name}</span>]");
                 }
             }
             spec::AssemblyElement::Dot => {
