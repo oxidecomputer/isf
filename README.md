@@ -23,6 +23,8 @@ is composed of three things
 A simple three-operand add instruction might look like this in ISF.
 
 ```isf
+instruction_width = 32;
+
 /// Add values from two registers
 instruction Add {
   fields:
@@ -93,6 +95,8 @@ format that is used by many instructions. For example, consider a binary
 operation instruction.
 
 ```isf
+instruction_width = 32;
+
 /// A base instruction for binary arithmetic operations
 instruction BinOp<name, opcode> {
   fields:
