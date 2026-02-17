@@ -59,7 +59,7 @@ impl AddOptField {
     fn src1_sel_mark_unset(&mut self) {
         self.0 = isf::bits::set_bit_u32(self.0, 29usize, true);
     }
-    fn parse_assembly_impl(text: &mut &str) -> winnow::PResult<Self> {
+    fn parse_assembly_impl(text: &mut &str) -> winnow::ModalResult<Self> {
         use winnow::Parser;
         let input = text;
         let mut result = Self::default();

@@ -40,7 +40,7 @@ impl Add {
     pub fn set_src2(&mut self, value: u8) {
         self.0 = isf::bits::set_u5_u32(self.0, 24usize, value);
     }
-    fn parse_assembly_impl(text: &mut &str) -> winnow::PResult<Self> {
+    fn parse_assembly_impl(text: &mut &str) -> winnow::ModalResult<Self> {
         use winnow::Parser;
         let input = text;
         let mut result = Self::default();
