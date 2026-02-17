@@ -8,15 +8,15 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = "1.0.92"
-expectorate = "1.1.0"
-num_enum = "0.7.3"
-prettyplease = "0.2.25"
-proc-macro2 = "1.0.89"
-quote = "1.0.37"
-syn = { version = "2.0.87", features = ["full"] }
-winnow = "0.6.20"
+anyhow = "1.0.101"
+expectorate = "1.2.0"
+num_enum = "0.7.5"
+prettyplease = "0.2.37"
+proc-macro2 = "1.0.106"
+quote = "1.0.44"
+syn = { version = "2.0.116", features = ["full"] }
+winnow = "0.6.26"
 serde = "1"
-clap = { version = "4.5.20", features = ["derive"] }
-liquid = "0.26.9"
+clap = { version = "4.5.59", features = ["derive"] }
+liquid = "0.26.11"
 comrak = "0.29.0"

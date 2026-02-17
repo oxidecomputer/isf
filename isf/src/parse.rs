@@ -14,11 +14,11 @@ use winnow::{
     combinator::{alt, cut_err, repeat, separated, trace},
     error::{ContextError, StrContext},
     token::{none_of, take_until},
-    PResult, Parser,
+    ModalResult, Parser,
 };
 
 /// Parse ISF text into an ISF AST.
-pub fn parse(input: &mut &str) -> PResult<ast::Ast> {
+pub fn parse(input: &mut &str) -> ModalResult<ast::Ast> {
     let spec = ast::Ast {
         characteristics: parse_characteristics.parse_next(input)?,
         classes: parse_classes.parse_next(input)?,
@@ -29,19 +29,19 @@ pub fn parse(input: &mut &str) -> PResult<ast::Ast> {
 
 fn parse_characteristics(
     input: &mut &str,
-) -> PResult<Vec<ast::Characteristic>> {
+) -> ModalResult<Vec<ast::Characteristic>> {
     let result = repeat(0.., characteristic).parse_next(input)?;
     Ok(result)
 }
 
-fn parse_classes(input: &mut &str) -> PResult<Vec<ast::Class>> {
+fn parse_classes(input: &mut &str) -> ModalResult<Vec<ast::Class>> {
     lcp.parse_next(input)?;
     let result = cut_err(repeat(0.., class)).parse_next(input)?;
     lcp.parse_next(input)?;
     Ok(result)
 }
 
-fn class(input: &mut &str) -> PResult<ast::Class> {
+fn class(input: &mut &str) -> ModalResult<ast::Class> {
     lcp.parse_next(input)?;
     let doc = docstring.parse_next(input)?;
     lcp.parse_next(input)?;
@@ -54,7 +54,7 @@ fn class(input: &mut &str) -> PResult<ast::Class> {
     Ok(instr)
 }
 
-fn class_body(input: &mut &str) -> PResult<ast::Class> {
+fn class_body(input: &mut &str) -> ModalResult<ast::Class> {
     let name = identifier_parser.parse_next(input)?;
     let _ = s("{").parse_next(input)?;
     lcp.parse_next(input)?;
@@ -68,14 +68,14 @@ fn class_body(input: &mut &str) -> PResult<ast::Class> {
     })
 }
 
-fn parse_instructions(input: &mut &str) -> PResult<Vec<ast::Instruction>> {
+fn parse_instructions(input: &mut &str) -> ModalResult<Vec<ast::Instruction>> {
     lcp.parse_next(input)?;
     let result = cut_err(repeat(0.., instruction)).parse_next(input)?;
     lcp.parse_next(input)?;
     Ok(result)
 }
 
-fn instruction(input: &mut &str) -> PResult<ast::Instruction> {
+fn instruction(input: &mut &str) -> ModalResult<ast::Instruction> {
     lcp.parse_next(input)?;
     let doc = docstring.parse_next(input)?;
     lcp.parse_next(input)?;
@@ -88,7 +88,7 @@ fn instruction(input: &mut &str) -> PResult<ast::Instruction> {
     Ok(instr)
 }
 
-fn instruction_body(input: &mut &str) -> PResult<ast::Instruction> {
+fn instruction_body(input: &mut &str) -> ModalResult<ast::Instruction> {
     let name = identifier_parser.parse_next(input)?;
     let parameters =
         instruction_parameters.parse_next(input).unwrap_or_default();
@@ -139,14 +139,14 @@ fn instruction_body(input: &mut &str) -> PResult<ast::Instruction> {
     })
 }
 
-fn instruction_parameters(input: &mut &str) -> PResult<Vec<String>> {
+fn instruction_parameters(input: &mut &str) -> ModalResult<Vec<String>> {
     let _ = s('<').parse_next(input)?;
     let params = separated(1.., identifier_parser, s(',')).parse_next(input)?;
     let _ = s('>').parse_next(input)?;
     Ok(params)
 }
 
-fn instruction_base(input: &mut &str) -> PResult<ast::Base> {
+fn instruction_base(input: &mut &str) -> ModalResult<ast::Base> {
     let _ = s(':').parse_next(input)?;
     let name = identifier_parser.parse_next(input)?;
     let _ = s('<').parse_next(input)?;
@@ -156,14 +156,14 @@ fn instruction_base(input: &mut &str) -> PResult<ast::Base> {
     Ok(ast::Base { name, parameters })
 }
 
-fn fields(input: &mut &str) -> PResult<Vec<ast::Field>> {
+fn fields(input: &mut &str) -> ModalResult<Vec<ast::Field>> {
     let result = cut_err(separated(0.., field, s(','))).parse_next(input)?;
     let _ = s(',').parse_next(input);
     lcp.parse_next(input)?;
     Ok(result)
 }
 
-fn timing(input: &mut &str) -> PResult<ast::Timing> {
+fn timing(input: &mut &str) -> ModalResult<ast::Timing> {
     lcp.parse_next(input)?;
     let result =
         alt((cycle_timing, async_timing, multi_timing)).parse_next(input)?;
@@ -171,23 +171,23 @@ fn timing(input: &mut &str) -> PResult<ast::Timing> {
     Ok(result)
 }
 
-fn cycle_timing(input: &mut &str) -> PResult<ast::Timing> {
+fn cycle_timing(input: &mut &str) -> ModalResult<ast::Timing> {
     let n = s(number_parser).parse_next(input)?;
     let _ = s("cycle").parse_next(input)?;
     Ok(ast::Timing::Cycle(n.try_into().unwrap()))
 }
 
-fn async_timing(input: &mut &str) -> PResult<ast::Timing> {
+fn async_timing(input: &mut &str) -> ModalResult<ast::Timing> {
     let _ = s("async").parse_next(input)?;
     Ok(ast::Timing::Async)
 }
 
-fn multi_timing(input: &mut &str) -> PResult<ast::Timing> {
+fn multi_timing(input: &mut &str) -> ModalResult<ast::Timing> {
     let _ = s("multi").parse_next(input)?;
     Ok(ast::Timing::Multi)
 }
 
-fn field(input: &mut &str) -> PResult<ast::Field> {
+fn field(input: &mut &str) -> ModalResult<ast::Field> {
     lcp.parse_next(input)?;
     let doc = docstring
         .context(StrContext::Label("field docstring"))
@@ -218,12 +218,12 @@ fn field(input: &mut &str) -> PResult<ast::Field> {
     })
 }
 
-fn docstring(input: &mut &str) -> PResult<String> {
+fn docstring(input: &mut &str) -> ModalResult<String> {
     let lines: Vec<String> = repeat(1.., docstring_line).parse_next(input)?;
     Ok(lines.join("\n"))
 }
 
-fn docstring_line(input: &mut &str) -> PResult<String> {
+fn docstring_line(input: &mut &str) -> ModalResult<String> {
     let _ = multispace0.parse_next(input)?;
     let _ = "///".parse_next(input)?;
     let ds = till_line_ending.parse_next(input)?;
@@ -231,7 +231,7 @@ fn docstring_line(input: &mut &str) -> PResult<String> {
     Ok(ds.trim().to_owned())
 }
 
-fn assembly(input: &mut &str) -> PResult<ast::Assembly> {
+fn assembly(input: &mut &str) -> ModalResult<ast::Assembly> {
     lcp.parse_next(input)?;
     let _ = multispace0.parse_next(input)?;
     let syntax: Vec<ast::AssemblyElement> = if !input.starts_with("examples:") {
@@ -251,7 +251,7 @@ fn assembly(input: &mut &str) -> PResult<ast::Assembly> {
     Ok(ast::Assembly { syntax, example })
 }
 
-fn assembly_element(input: &mut &str) -> PResult<ast::AssemblyElement> {
+fn assembly_element(input: &mut &str) -> ModalResult<ast::AssemblyElement> {
     alt((
         assembly_element_expansion,
         assembly_element_string_literal,
@@ -265,7 +265,7 @@ fn assembly_element(input: &mut &str) -> PResult<ast::AssemblyElement> {
     .parse_next(input)
 }
 
-fn string_literal(input: &mut &str) -> PResult<String> {
+fn string_literal(input: &mut &str) -> ModalResult<String> {
     let _ = "'".parse_next(input)?;
     let content = take_until(0.., "'").parse_next(input)?;
     let _ = "'".parse_next(input)?;
@@ -274,7 +274,7 @@ fn string_literal(input: &mut &str) -> PResult<String> {
 
 fn assembly_element_expansion(
     input: &mut &str,
-) -> PResult<ast::AssemblyElement> {
+) -> ModalResult<ast::AssemblyElement> {
     let _ = '$'.parse_next(input)?;
     let name = identifier_parser_nospace.parse_next(input)?;
     Ok(ast::AssemblyElement::Expansion { name })
@@ -282,7 +282,7 @@ fn assembly_element_expansion(
 
 fn assembly_element_string_literal(
     input: &mut &str,
-) -> PResult<ast::AssemblyElement> {
+) -> ModalResult<ast::AssemblyElement> {
     let content = string_literal.parse_next(input)?;
     Ok(ast::AssemblyElement::StringLiteral {
         value: content.to_owned(),
@@ -291,7 +291,7 @@ fn assembly_element_string_literal(
 
 fn assembly_element_optional_flag(
     input: &mut &str,
-) -> PResult<ast::AssemblyElement> {
+) -> ModalResult<ast::AssemblyElement> {
     let _ = '['.parse_next(input)?;
     let target = s(string_literal).parse_next(input)?;
     let _ = s('=').parse_next(input)?;
@@ -305,7 +305,7 @@ fn assembly_element_optional_flag(
 
 fn assembly_element_optional_field(
     input: &mut &str,
-) -> PResult<ast::AssemblyElement> {
+) -> ModalResult<ast::AssemblyElement> {
     let _ = '['.parse_next(input)?;
     let with_dot = s('.').parse_next(input).is_ok();
     let name = s(identifier_parser).parse_next(input)?;
@@ -313,33 +313,39 @@ fn assembly_element_optional_field(
     Ok(ast::AssemblyElement::OptionalField { name, with_dot })
 }
 
-fn assembly_element_dot(input: &mut &str) -> PResult<ast::AssemblyElement> {
+fn assembly_element_dot(input: &mut &str) -> ModalResult<ast::AssemblyElement> {
     let _ = ".".parse_next(input)?;
     Ok(ast::AssemblyElement::Dot)
 }
 
-fn assembly_element_comma(input: &mut &str) -> PResult<ast::AssemblyElement> {
+fn assembly_element_comma(
+    input: &mut &str,
+) -> ModalResult<ast::AssemblyElement> {
     let _ = ",".parse_next(input)?;
     Ok(ast::AssemblyElement::Comma)
 }
 
-fn assembly_element_space(input: &mut &str) -> PResult<ast::AssemblyElement> {
+fn assembly_element_space(
+    input: &mut &str,
+) -> ModalResult<ast::AssemblyElement> {
     let _ = alt((s("\n"), multispace1)).parse_next(input)?;
     Ok(ast::AssemblyElement::Space)
 }
 
 fn assembly_element_identifier(
     input: &mut &str,
-) -> PResult<ast::AssemblyElement> {
+) -> ModalResult<ast::AssemblyElement> {
     let value = identifier_parser_nospace.parse_next(input)?;
     Ok(ast::AssemblyElement::Field { name: value })
 }
 
-fn assembly_examples(input: &mut &str) -> PResult<Vec<ast::AssemblyExample>> {
+fn assembly_examples(
+    input: &mut &str,
+) -> ModalResult<Vec<ast::AssemblyExample>> {
     cut_err(repeat(0.., assembly_example)).parse_next(input)
 }
 
-fn assembly_example(input: &mut &str) -> PResult<ast::AssemblyExample> {
+fn assembly_example(input: &mut &str) -> ModalResult<ast::AssemblyExample> {
     lcp.parse_next(input)?;
     let doc = docstring.parse_next(input)?;
     lcp.parse_next(input)?;
@@ -349,14 +355,14 @@ fn assembly_example(input: &mut &str) -> PResult<ast::AssemblyExample> {
     Ok(ast::AssemblyExample { doc, example })
 }
 
-fn machine(input: &mut &str) -> PResult<ast::Machine> {
+fn machine(input: &mut &str) -> ModalResult<ast::Machine> {
     let layout = separated(1.., machine_element, s(',')).parse_next(input)?;
     let _ = s(',').parse_next(input);
     lcp.parse_next(input)?;
     Ok(ast::Machine { layout })
 }
 
-fn machine_element(input: &mut &str) -> PResult<ast::MachineElement> {
+fn machine_element(input: &mut &str) -> ModalResult<ast::MachineElement> {
     lcp.parse_next(input)?;
     let result = alt((machine_element_constant, machine_element_field))
         .parse_next(input)?;
@@ -364,7 +370,7 @@ fn machine_element(input: &mut &str) -> PResult<ast::MachineElement> {
     Ok(result)
 }
 
-fn machine_element_field(input: &mut &str) -> PResult<ast::MachineElement> {
+fn machine_element_field(input: &mut &str) -> ModalResult<ast::MachineElement> {
     let name = identifier_parser.parse_next(input)?;
     if tag('[').parse_next(input).is_ok() {
         let begin = number_parser.parse_next(input)?;
@@ -389,7 +395,9 @@ fn machine_element_field(input: &mut &str) -> PResult<ast::MachineElement> {
     }
 }
 
-fn machine_element_constant(input: &mut &str) -> PResult<ast::MachineElement> {
+fn machine_element_constant(
+    input: &mut &str,
+) -> ModalResult<ast::MachineElement> {
     let name = identifier_parser.parse_next(input)?;
     let _ = s(':').parse_next(input)?;
     let width = s(number_parser).parse_next(input)?;
@@ -407,7 +415,7 @@ fn machine_element_constant(input: &mut &str) -> PResult<ast::MachineElement> {
 
 fn machine_element_value(
     input: &mut &str,
-) -> PResult<ast::MachineElementValue> {
+) -> ModalResult<ast::MachineElementValue> {
     if let Ok(number) = number_parser.parse_next(input) {
         let v = ast::MachineElementValue::NumericConstant(number);
         return Ok(v);
@@ -418,7 +426,7 @@ fn machine_element_value(
     Ok(v)
 }
 
-fn base_parameter(input: &mut &str) -> PResult<ast::BaseParameter> {
+fn base_parameter(input: &mut &str) -> ModalResult<ast::BaseParameter> {
     if let Ok(number) = number_parser.parse_next(input) {
         return Ok(ast::BaseParameter::Number(number));
     };
@@ -426,7 +434,7 @@ fn base_parameter(input: &mut &str) -> PResult<ast::BaseParameter> {
     Ok(ast::BaseParameter::Text(name))
 }
 
-fn characteristic(input: &mut &str) -> PResult<ast::Characteristic> {
+fn characteristic(input: &mut &str) -> ModalResult<ast::Characteristic> {
     lcp.parse_next(input)?;
     // add others as alternates as they arise
     let result = instruction_width_characteristic.parse_next(input)?;
@@ -435,7 +443,7 @@ fn characteristic(input: &mut &str) -> PResult<ast::Characteristic> {
 
 fn instruction_width_characteristic(
     input: &mut &str,
-) -> PResult<ast::Characteristic> {
+) -> ModalResult<ast::Characteristic> {
     let _ = s("instruction_width").parse_next(input)?;
     let _ = s("=").parse_next(input)?;
     let width = number_parser.parse_next(input)?;
@@ -446,18 +454,18 @@ fn instruction_width_characteristic(
 }
 
 /// Parse an identifier.
-pub fn identifier_parser(input: &mut &str) -> PResult<String> {
+pub fn identifier_parser(input: &mut &str) -> ModalResult<String> {
     let ident = s((alt(("_", alpha1)), alphanumunder0)).parse_next(input)?;
     Ok(format!("{}{}", ident.0, ident.1))
 }
 
-pub fn identifier_parser_nospace(input: &mut &str) -> PResult<String> {
+pub fn identifier_parser_nospace(input: &mut &str) -> ModalResult<String> {
     let ident = (alt(("_", alpha1)), alphanumunder0).parse_next(input)?;
     Ok(format!("{}{}", ident.0, ident.1))
 }
 
 /// Parse a series of alphanumeric chracters or underscore.
-pub fn alphanumunder0(input: &mut &str) -> PResult<String> {
+pub fn alphanumunder0(input: &mut &str) -> ModalResult<String> {
     let result = repeat(0.., alt((alphanumeric1, "_"))).parse_next(input)?;
     Ok(result)
 }
@@ -491,7 +499,7 @@ where
 }
 
 /// Parse c-style a line comment.
-pub fn line_comment_parser(input: &mut &str) -> PResult<(), ContextError> {
+pub fn line_comment_parser(input: &mut &str) -> ModalResult<(), ContextError> {
     let _ = multispace0.parse_next(input)?;
     let _ = ("//", none_of(['/'])).parse_next(input)?;
     let _ = till_line_ending.parse_next(input)?;
@@ -499,11 +507,11 @@ pub fn line_comment_parser(input: &mut &str) -> PResult<(), ContextError> {
     Ok(())
 }
 
-pub fn lcp(input: &mut &str) -> PResult<(), ContextError> {
+pub fn lcp(input: &mut &str) -> ModalResult<(), ContextError> {
     repeat(0.., line_comment_parser).parse_next(input)
 }
 
-pub fn number_parser(input: &mut &str) -> PResult<u64> {
+pub fn number_parser(input: &mut &str) -> ModalResult<u64> {
     if s("0x").parse_next(input).is_ok() {
         let s = hex_digit1.parse_next(input)?;
         let n = u64::from_str_radix(s, 16).unwrap();
