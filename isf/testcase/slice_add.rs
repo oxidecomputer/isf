@@ -37,7 +37,7 @@ impl SliceAdd {
         self.0 = isf::bits::set_u7_u32(self.0, 16usize, (value >> 0usize) as u8);
         self.0 = isf::bits::set_u7_u32(self.0, 25usize, (value >> 7usize) as u8);
     }
-    fn parse_assembly_impl(text: &mut &str) -> winnow::PResult<Self> {
+    fn parse_assembly_impl(text: &mut &str) -> winnow::ModalResult<Self> {
         use winnow::Parser;
         let input = text;
         let mut result = Self::default();

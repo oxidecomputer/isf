@@ -71,7 +71,7 @@ pub fn generate_instruction(
 
         impl #name {
             #field_methods
-            fn parse_assembly_impl(text: &mut &str) -> winnow::PResult<Self> {
+            fn parse_assembly_impl(text: &mut &str) -> winnow::ModalResult<Self> {
                 use winnow::Parser;
                 let input = text;
                 #assembly_parser

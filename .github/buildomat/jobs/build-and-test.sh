@@ -16,7 +16,7 @@ set -o xtrace
 
 cargo --version
 rustc --version
-cargo install cargo-nextest
+cargo install cargo-nextest --locked
 
 echo "##### check #####"
 cargo fmt -- --check
