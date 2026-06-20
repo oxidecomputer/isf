@@ -31,7 +31,6 @@ pub struct ClassInstance {
     pub value: u64,
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct Class {
     pub doc: String,

@@ -10,7 +10,7 @@ use std::{
     fs::read_to_string,
 };
 
-use crate::spec::{self, AssemblyElement, FieldOrder, Class, MachineElement};
+use crate::spec::{self, AssemblyElement, Class, FieldOrder, MachineElement};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::Ident;
@@ -34,15 +34,17 @@ pub fn generate_code(path: &str) -> anyhow::Result<String> {
 /// generated structs implement the [`AssemblyInstruction`] and
 /// [`MachineInstruction`] traits. They also contain getter and setter
 /// methods for each field.
-pub fn generate(
-    spec: &spec::Spec,
-) -> TokenStream {
+pub fn generate(spec: &spec::Spec) -> TokenStream {
     let mut tokens = TokenStream::default();
     let storage = uint_size(spec.instruction_width);
 
     for instruction in &spec.instructions {
-        let instr_tokens =
-            generate_instruction(storage, instruction, &spec.classes, spec.field_order.clone());
+        let instr_tokens = generate_instruction(
+            storage,
+            instruction,
+            &spec.classes,
+            spec.field_order.clone(),
+        );
         tokens.extend(instr_tokens);
     }
 
@@ -298,7 +300,7 @@ pub fn generate_field_methods(
 
     let machine_elements: Vec<&MachineElement> = match field_order {
         FieldOrder::LsbFirst => instr.machine.layout.iter().collect(),
-        FieldOrder::MsbFirst => instr.machine.layout.iter().rev().collect()
+        FieldOrder::MsbFirst => instr.machine.layout.iter().rev().collect(),
     };
 
     for me in machine_elements {
@@ -637,14 +639,18 @@ pub fn generate_assembly_parser(
                     let class =
                         class_map.get(class_name).unwrap_or_else(|| {
                             panic!("class {class_name} couldn't be found")
-                    });
+                        });
                     if !class.instances.is_empty() {
                         // generate a match between instance names and values
-                        let match_arms: Vec<TokenStream> = class.instances.iter().map(|i| {
-                            let name = &i.name;
-                            let value = i.value;
-                            quote!{ #name => Some(#value) } 
-                        }).collect();
+                        let match_arms: Vec<TokenStream> = class
+                            .instances
+                            .iter()
+                            .map(|i| {
+                                let name = &i.name;
+                                let value = i.value;
+                                quote! { #name => Some(#value) }
+                            })
+                            .collect();
 
                         tks.extend(quote! {
                             let #field: u64 = winnow::combinator::alt((
@@ -658,20 +664,17 @@ pub fn generate_assembly_parser(
                                 isf::parse::number_parser,
                             )).parse_next(input)?;
                         });
-                    }
-                    else {
+                    } else {
                         tks.extend(quote! {
                         let #field: u64 = isf::parse::number_parser.parse_next(input)?;
-                        
+
                         })
                     }
-                }
-                else {
+                } else {
                     tks.extend(quote! {
                     let #field: u64 = isf::parse::number_parser.parse_next(input)?;
-                    
+
                     })
-                    
                 }
 
                 if field_info.width == 1 {
