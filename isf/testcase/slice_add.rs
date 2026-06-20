@@ -97,3 +97,11 @@ impl isf::MachineInstruction<u32> for SliceAdd {
         self.0
     }
 }
+pub fn parse_instruction(text: &str) -> Option<u32> {
+    use isf::AssemblyInstruction;
+    use isf::MachineInstruction;
+    if let Ok(inst) = SliceAdd::parse_assembly(text) {
+        return Some(inst.emit_machine());
+    }
+    None
+}

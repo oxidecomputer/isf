@@ -150,3 +150,11 @@ impl isf::MachineInstruction<u32> for AddOptField {
         self.0
     }
 }
+pub fn parse_instruction(text: &str) -> Option<u32> {
+    use isf::AssemblyInstruction;
+    use isf::MachineInstruction;
+    if let Ok(inst) = AddOptField::parse_assembly(text) {
+        return Some(inst.emit_machine());
+    }
+    None
+}
