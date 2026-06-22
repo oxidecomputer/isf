@@ -10,19 +10,33 @@ use std::collections::HashMap;
 use crate::ast::{self, Base, BaseParameter, Timing};
 use anyhow::{anyhow, Result};
 
+#[derive(Debug, Clone)]
+pub enum FieldOrder {
+    LsbFirst,
+    MsbFirst,
+}
+
 /// Concrete ISF specification resolved from ISF AST.
 #[derive(Debug)]
 pub struct Spec {
     pub instruction_width: usize,
+    pub field_order: FieldOrder,
     pub instructions: Vec<Instruction>,
     pub classes: HashMap<String, Class>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
+pub struct ClassInstance {
+    pub name: String,
+    pub value: u64,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Class {
     pub doc: String,
     pub name: String,
     pub width: usize,
+    pub instances: Vec<ClassInstance>,
 }
 
 /// Concrete instruction. Base instruction elements fully incorporated.
@@ -323,7 +337,7 @@ impl Instruction {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct Field {
     pub doc: String,
     pub name: String,
@@ -434,6 +448,7 @@ pub fn form_spec(ast: &ast::Ast) -> Result<Spec> {
                     name: c.name.clone(),
                     doc: c.doc.clone(),
                     width: c.width,
+                    instances: Vec::new(),
                 },
             )
         })
@@ -449,6 +464,7 @@ pub fn form_spec(ast: &ast::Ast) -> Result<Spec> {
 
     Ok(Spec {
         instruction_width,
+        field_order: FieldOrder::LsbFirst,
         instructions,
         classes,
     })

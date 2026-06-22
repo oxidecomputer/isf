@@ -5,9 +5,12 @@
 //! This module contains a Rust codegen implementation for ISF. The
 //! [`generate`] function produces Rust code from an ISF `[spec::Spec]`.
 
-use std::{collections::BTreeMap, fs::read_to_string};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs::read_to_string,
+};
 
-use crate::spec::{self, AssemblyElement, MachineElement};
+use crate::spec::{self, AssemblyElement, Class, FieldOrder, MachineElement};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::Ident;
@@ -36,9 +39,17 @@ pub fn generate(spec: &spec::Spec) -> TokenStream {
     let storage = uint_size(spec.instruction_width);
 
     for instruction in &spec.instructions {
-        let instr_tokens = generate_instruction(storage, instruction);
+        let instr_tokens = generate_instruction(
+            storage,
+            instruction,
+            &spec.classes,
+            spec.field_order.clone(),
+        );
         tokens.extend(instr_tokens);
     }
+
+    let dispatch = generate_dispatch(&spec.instructions, storage);
+    tokens.extend(dispatch);
 
     tokens
 }
@@ -46,13 +57,15 @@ pub fn generate(spec: &spec::Spec) -> TokenStream {
 pub fn generate_instruction(
     storage: usize,
     instr: &spec::Instruction,
+    class_map: &HashMap<String, Class>,
+    field_order: FieldOrder,
 ) -> TokenStream {
     let name = format_ident!("{}", instr.name);
     let storage = format_ident!("u{storage}");
 
     let default_impl = generate_default_impl(instr);
-    let field_methods = generate_field_methods(instr, &storage);
-    let assembly_parser = generate_assembly_parser(instr);
+    let field_methods = generate_field_methods(instr, &storage, field_order);
+    let assembly_parser = generate_assembly_parser(instr, class_map);
     let assembly_emitter = generate_assembly_emitter(instr);
     let machine_parser = generate_machine_parser(instr);
 
@@ -274,8 +287,10 @@ pub fn generate_assembly_emitter(instr: &spec::Instruction) -> TokenStream {
 pub fn generate_field_methods(
     instr: &spec::Instruction,
     storage: &Ident,
+    field_order: FieldOrder,
 ) -> TokenStream {
     let mut tks = TokenStream::default();
+
     let mut offset = 0usize;
 
     let mut setters = BTreeMap::<String, (bool, Ident, TokenStream)>::default();
@@ -283,7 +298,12 @@ pub fn generate_field_methods(
     let mut set_indicators = BTreeMap::<String, TokenStream>::default();
     let mut mark_unset = BTreeMap::<String, TokenStream>::default();
 
-    for me in &instr.machine.layout {
+    let machine_elements: Vec<&MachineElement> = match field_order {
+        FieldOrder::LsbFirst => instr.machine.layout.iter().collect(),
+        FieldOrder::MsbFirst => instr.machine.layout.iter().rev().collect(),
+    };
+
+    for me in machine_elements {
         let (
             name,
             width,
@@ -526,7 +546,10 @@ pub fn generate_field_methods(
     tks
 }
 
-pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
+pub fn generate_assembly_parser(
+    instr: &spec::Instruction,
+    class_map: &HashMap<String, spec::Class>,
+) -> TokenStream {
     let mut tks = TokenStream::default();
 
     if instr.fields.is_empty() {
@@ -611,14 +634,55 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
                 let field_info = instr
                     .get_field(name)
                     .unwrap_or_else(|| panic!("field {name} undefined"));
+
+                if let Some(class_name) = &field_info.class {
+                    let class =
+                        class_map.get(class_name).unwrap_or_else(|| {
+                            panic!("class {class_name} couldn't be found")
+                        });
+                    if !class.instances.is_empty() {
+                        // generate a match between instance names and values
+                        let match_arms: Vec<TokenStream> = class
+                            .instances
+                            .iter()
+                            .map(|i| {
+                                let name = &i.name;
+                                let value = i.value;
+                                quote! { #name => Some(#value) }
+                            })
+                            .collect();
+
+                        tks.extend(quote! {
+                            let #field: u64 = winnow::combinator::alt((
+                                isf::parse::identifier_parser_nospace
+                                    .verify_map(|token: String| {
+                                        match token.as_str() {
+                                            #(#match_arms),*,
+                                            _ => None
+                                        }
+                                    }),
+                                isf::parse::number_parser,
+                            )).parse_next(input)?;
+                        });
+                    } else {
+                        tks.extend(quote! {
+                        let #field: u64 = isf::parse::number_parser.parse_next(input)?;
+
+                        })
+                    }
+                } else {
+                    tks.extend(quote! {
+                    let #field: u64 = isf::parse::number_parser.parse_next(input)?;
+
+                    })
+                }
+
                 if field_info.width == 1 {
                     tks.extend(quote! {
-                        let #field: u64 = isf::parse::number_parser.parse_next(input)?;
                         result.#setter(#field != 0);
                     });
                 } else {
                     tks.extend(quote! {
-                        let #field: u64 = isf::parse::number_parser.parse_next(input)?;
                         result.#setter(#field.try_into().unwrap());
                     });
                 }
@@ -630,6 +694,38 @@ pub fn generate_assembly_parser(instr: &spec::Instruction) -> TokenStream {
     });
 
     tks
+}
+
+pub fn generate_dispatch(
+    instructions: &[spec::Instruction],
+    storage: usize,
+) -> TokenStream {
+    let storage_type = format_ident!("u{storage}");
+    let names: Vec<Ident> = instructions
+        .iter()
+        .map(|instr| format_ident!("{}", instr.name))
+        .collect();
+
+    quote! {
+        #[doc = " Assemble a single instruction from its assembly text into a machine word."]
+        #[doc = ""]
+        #[doc = " `text` must contain exactly one instruction: each candidate instruction is"]
+        #[doc = " parsed with [`isf::AssemblyInstruction::parse_assembly`], which requires the"]
+        #[doc = " *entire* input to be consumed. Any trailing content (a second instruction, a"]
+        #[doc = " comment, stray whitespace) causes that candidate to fail, so multi-line or"]
+        #[doc = " multi-instruction input returns `None`. Returns the machine encoding of the"]
+        #[doc = " first instruction whose syntax matches, or `None` if none do."]
+        pub fn parse_instruction(text: &str) -> Option<#storage_type> {
+            use isf::AssemblyInstruction;
+            use isf::MachineInstruction;
+            #(
+                if let Ok(inst) = #names::parse_assembly(text) {
+                    return Some(inst.emit_machine());
+                }
+            )*
+            None
+        }
+    }
 }
 
 fn uint_size(bits: usize) -> usize {
