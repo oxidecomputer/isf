@@ -707,6 +707,14 @@ pub fn generate_dispatch(
         .collect();
 
     quote! {
+        #[doc = " Assemble a single instruction from its assembly text into a machine word."]
+        #[doc = ""]
+        #[doc = " `text` must contain exactly one instruction: each candidate instruction is"]
+        #[doc = " parsed with [`isf::AssemblyInstruction::parse_assembly`], which requires the"]
+        #[doc = " *entire* input to be consumed. Any trailing content (a second instruction, a"]
+        #[doc = " comment, stray whitespace) causes that candidate to fail, so multi-line or"]
+        #[doc = " multi-instruction input returns `None`. Returns the machine encoding of the"]
+        #[doc = " first instruction whose syntax matches, or `None` if none do."]
         pub fn parse_instruction(text: &str) -> Option<#storage_type> {
             use isf::AssemblyInstruction;
             use isf::MachineInstruction;

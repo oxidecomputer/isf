@@ -109,6 +109,14 @@ impl isf::MachineInstruction<u32> for Add {
         self.0
     }
 }
+/// Assemble a single instruction from its assembly text into a machine word.
+///
+/// `text` must contain exactly one instruction: each candidate instruction is
+/// parsed with [`isf::AssemblyInstruction::parse_assembly`], which requires the
+/// *entire* input to be consumed. Any trailing content (a second instruction, a
+/// comment, stray whitespace) causes that candidate to fail, so multi-line or
+/// multi-instruction input returns `None`. Returns the machine encoding of the
+/// first instruction whose syntax matches, or `None` if none do.
 pub fn parse_instruction(text: &str) -> Option<u32> {
     use isf::AssemblyInstruction;
     use isf::MachineInstruction;
