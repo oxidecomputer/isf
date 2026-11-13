@@ -13,7 +13,7 @@ use winnow::{
     },
     combinator::{alt, cut_err, repeat, separated, trace},
     error::{ContextError, StrContext},
-    token::{none_of, take_until},
+    token::{none_of, take_until, take_while},
     ModalResult, Parser,
 };
 
@@ -515,6 +515,12 @@ pub fn number_parser(input: &mut &str) -> ModalResult<u64> {
     if s("0x").parse_next(input).is_ok() {
         let s = hex_digit1.parse_next(input)?;
         let n = u64::from_str_radix(s, 16).unwrap();
+        Ok(n)
+    } else if s("0b").parse_next(input).is_ok() {
+        let s = take_while(1.., |c: char| c == '0' || c == '1' || c == '_')
+            .parse_next(input)?;
+        let clean: String = s.chars().filter(|c| *c != '_').collect();
+        let n = u64::from_str_radix(&clean, 2).unwrap();
         Ok(n)
     } else {
         let s = digit1.parse_next(input)?;
